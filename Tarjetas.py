@@ -8,7 +8,6 @@ import requests
 import pandas as pd
 import plotly.express as px
 import streamlit as st
-import streamlit.components.v1 as components
 
 # ---------------------------------------------------------
 # CONFIGURACIÓN DE PÁGINA
@@ -21,37 +20,7 @@ st.set_page_config(
 )
 
 # ---------------------------------------------------------
-# SCRIPT INVISIBLE: BLOQUEO DEFINITIVO DEL TECLADO EN MÓVILES
-# ---------------------------------------------------------
-# Esto inyecta JavaScript para poner 'inputmode=none' y 'readonly' 
-# a los filtros de Streamlit, evitando que Android/iOS abran el teclado.
-components.html(
-    """
-    <script>
-    const doc = window.parent.document;
-    function blockVirtualKeyboard() {
-        // Seleccionar todos los campos de texto dentro de los selectbox
-        const inputs = doc.querySelectorAll('div[data-baseweb="select"] input');
-        inputs.forEach(input => {
-            input.setAttribute('inputmode', 'none'); // Apaga el teclado en móviles
-            input.setAttribute('readonly', 'true');  // Evita que se active el cursor
-            input.style.caretColor = 'transparent';  // Oculta la rayita de escritura
-        });
-    }
-    
-    // Ejecutar al cargar
-    blockVirtualKeyboard();
-    
-    // Mantener un monitor constante por si Streamlit redibuja la pantalla
-    setInterval(blockVirtualKeyboard, 400);
-    </script>
-    """,
-    height=0,
-    width=0,
-)
-
-# ---------------------------------------------------------
-# ESTILOS CSS PERSONALIZADOS (MODO OSCURO)
+# ESTILOS CSS PERSONALIZADOS (MODO OSCURO Y BLOQUEO DE TECLADO)
 # ---------------------------------------------------------
 st.markdown(
     """
@@ -62,6 +31,21 @@ st.markdown(
         }
         [data-testid="stHeader"] { background-color: rgba(0, 0, 0, 0) !important; }
         .block-container { padding: 1.2rem 0.8rem 2rem 0.8rem; max-width: 740px; }
+
+        /* 🚫 BLOQUEO DEFINITIVO DEL TECLADO EN MÓVILES 🚫 */
+        /* Al apuntar directamente al tag 'input' dentro del selectbox, bloqueamos el foco que llama al teclado,
+           pero mantenemos vivo el contenedor para que la lista despliegue al tocar la caja o la flecha. */
+        div[data-baseweb="select"] input {
+            pointer-events: none !important;
+            user-select: none !important;
+            -webkit-user-select: none !important;
+            -moz-user-select: none !important;
+        }
+        
+        /* Aseguramos que los radio buttons sigan funcionando normal */
+        div[data-testid="stRadio"] input {
+             pointer-events: auto !important;
+        }
 
         /* Bloquea la captura táctil de Plotly para permitir scroll de página fluido */
         .js-plotly-plot, .plotly, .plot-container, .main-svg {
