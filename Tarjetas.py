@@ -21,10 +21,8 @@ st.set_page_config(
 )
 
 # ---------------------------------------------------------
-# SCRIPT INVISIBLE: CIERRE AUTOMÁTICO DEL DESPLEGABLE
+# SCRIPT INVISIBLE: CIERRE AUTOMÁTICO AL SELECCIONAR
 # ---------------------------------------------------------
-# Al tocar cualquier opción dentro del popover, simula la tecla Escape
-# para replegar la lista automáticamente de inmediato.
 components.html(
     """
     <script>
@@ -43,7 +41,7 @@ components.html(
 )
 
 # ---------------------------------------------------------
-# ESTILOS CSS PERSONALIZADOS (MODO OSCURO Y FIX BOTÓN FILTRO)
+# ESTILOS CSS PERSONALIZADOS (OPCIÓN 1: POPOVER + FUENTE GRANDE)
 # ---------------------------------------------------------
 st.markdown(
     """
@@ -55,19 +53,7 @@ st.markdown(
         [data-testid="stHeader"] { background-color: rgba(0, 0, 0, 0) !important; }
         .block-container { padding: 1.2rem 0.8rem 2rem 0.8rem; max-width: 740px; }
 
-        /* 🚫 BLOQUEO DE TECLADO EN SELECTBOXES 🚫 */
-        div[data-baseweb="select"] input {
-            pointer-events: none !important;
-            user-select: none !important;
-            -webkit-user-select: none !important;
-            -moz-user-select: none !important;
-        }
-        
-        div[data-testid="stRadio"] input {
-             pointer-events: auto !important;
-        }
-
-        /* 🎨 FIX ABSOLUTO PARA EL BOTÓN DEL FILTRO (NUNCA MÁS BLANCO) 🎨 */
+        /* 🎨 BOTÓN PRINCIPAL DEL FILTRO (SIEMPRE OSCURO) 🎨 */
         div[data-testid="stPopover"], 
         div[data-testid="stPopover"] > button,
         button[data-testid="stPopoverButton"] {
@@ -86,7 +72,7 @@ st.markdown(
             color: #FFFFFF !important;
             -webkit-text-fill-color: #FFFFFF !important;
             font-weight: 700 !important;
-            font-size: 0.98rem !important;
+            font-size: 1.05rem !important;
         }
 
         div[data-testid="stPopover"] button:hover,
@@ -96,17 +82,35 @@ st.markdown(
             border-color: #107C41 !important;
         }
 
-        /* Ventana flotante de la lista */
+        /* 📱 CAJA FLOTANTE OPCIÓN 1 (OPCIONES TÁCTILES Y DOBLE LÍNEA) 📱 */
         div[data-baseweb="popover"], div[data-testid="stPopoverBody"] {
             background-color: #1E222B !important;
-            border: 1.5px solid #00D1B2 !important;
+            border: 1.8px solid #00D1B2 !important;
             border-radius: 12px !important;
-            padding: 10px !important;
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6) !important;
+            padding: 14px !important;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.7) !important;
         }
+
         div[data-baseweb="popover"] *, div[data-testid="stPopoverBody"] * {
             color: #FAFAFA !important;
             -webkit-text-fill-color: #FAFAFA !important;
+        }
+
+        /* Área táctil ampliada y ajuste multilínea para nombres largos */
+        div[data-testid="stPopoverBody"] div[data-testid="stRadio"] label {
+            padding: 10px 6px !important;
+            margin-bottom: 6px !important;
+            white-space: normal !important;
+            word-wrap: break-word !important;
+            word-break: break-word !important;
+            line-height: 1.35 !important;
+            display: flex !important;
+            align-items: center !important;
+        }
+
+        div[data-testid="stPopoverBody"] div[data-testid="stRadio"] label p {
+            font-size: 1.15rem !important;
+            font-weight: 700 !important;
         }
 
         /* Bloquea la captura táctil de Plotly para permitir scroll de página fluido */
@@ -126,12 +130,6 @@ st.markdown(
         [data-testid="stMarkdownContainer"] h6 {
             color: #FFFFFF !important;
             -webkit-text-fill-color: #FFFFFF !important;
-        }
-        [data-testid="stExpander"] summary p {
-            color: #FFFFFF !important;
-            -webkit-text-fill-color: #FFFFFF !important;
-            font-weight: 800 !important;
-            font-size: 1.1rem !important;
         }
 
         div[data-testid="stTabs"] button[role="tab"] {
@@ -178,10 +176,6 @@ st.markdown(
         div[data-testid="stButton"] > button:hover, div[data-testid="stDownloadButton"] > button:hover {
             background-color: #107C41 !important;
             border-color: #107C41 !important;
-        }
-        div[data-testid="stButton"] > button:hover *, div[data-testid="stDownloadButton"] > button:hover * {
-            color: #FFFFFF !important;
-            -webkit-text-fill-color: #FFFFFF !important;
         }
 
         .credit-card-box { background-color: #1E222B; border: 1px solid #2D323E; border-radius: 12px; padding: 12px 14px; margin-bottom: 12px;}
@@ -386,7 +380,7 @@ with tab_categoria:
 
 
 # =========================================================
-# SECCIÓN 2: GRÁFICOS OPTIMIZADOS
+# SECCIÓN 2: GRÁFICOS OPTIMIZADOS (OPCIÓN 1 FIJA)
 # =========================================================
 st.markdown("---")
 st.markdown("<h3 style='color: #FFFFFF !important;'>📊 Gráficos Dinámicos</h3>", unsafe_allow_html=True)
@@ -416,6 +410,7 @@ with tab_grafico_evolucion_anual:
         if "est_seleccionado" not in st.session_state:
             st.session_state.est_seleccionado = "Todos"
             
+        # 📌 OPCIÓN 1: FILTRO CON CAJA Y VIÑETAS (POPOVER) 📌
         with st.popover(f"📍 Filtro: {st.session_state.est_seleccionado}"):
             est_seleccionado = st.radio("Selecciona Establecimiento:", options=establecimientos, index=establecimientos.index(st.session_state.est_seleccionado), key="radio_est")
             if est_seleccionado != st.session_state.est_seleccionado:
