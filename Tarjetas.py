@@ -367,7 +367,7 @@ else:
     )
 
 # =========================================================
-# SECCIÓN 1: SOLO TABLAS (ESTILO EXCEL)
+# SECCIÓN 1: SOLO TABLAS (ESTILO EXCEL CON ORDENACIÓN CORREGIDA)
 # =========================================================
 st.markdown("---")
 st.markdown("<h3 style='color: #FFFFFF !important;'>📋 Tablas de Detalles</h3>", unsafe_allow_html=True)
@@ -376,7 +376,13 @@ tab_anio, tab_cat_anio, tab_tarjeta, tab_categoria = st.tabs(["Año \\ Valor", "
 
 with tab_anio:
     if not df_filtrado.empty:
-        tabla_anio = df_filtrado.groupby("Año", as_index=False)["Valor"].sum().rename(columns={"Año": "Etiquetas de fila", "Valor": "Suma de Valor"}).sort_values(by="Suma de Valor", ascending=False)
+        # Ordenado por Año descendente (2026 -> 2025 -> 2024)
+        tabla_anio = (
+            df_filtrado.groupby("Año", as_index=False)["Valor"]
+            .sum()
+            .rename(columns={"Año": "Etiquetas de fila", "Valor": "Suma de Valor"})
+            .sort_values(by="Etiquetas de fila", ascending=False)
+        )
         tabla_anio["Etiquetas de fila"] = tabla_anio["Etiquetas de fila"].astype(str)
         fila_total = pd.DataFrame([{"Etiquetas de fila": "Total general", "Suma de Valor": tabla_anio["Suma de Valor"].sum()}])
         tabla_anio_final = pd.concat([tabla_anio, fila_total], ignore_index=True)
@@ -384,13 +390,34 @@ with tab_anio:
 
 with tab_cat_anio:
     if not df_filtrado.empty:
-        tabla_dinamica = df_filtrado.groupby(["Establecimiento", "Año"], as_index=False)["Valor"].sum().rename(columns={"Establecimiento": "Categoría", "Valor": "Suma de Valor"}).sort_values(by=["Categoría", "Año"])
+        # 1. Calcular consumo total por categoría para definir el orden de categorías
+        cat_totals = df_filtrado.groupby("Establecimiento")["Valor"].sum().reset_index().rename(columns={"Valor": "Cat_Total"})
+        
+        # 2. Agrupar por Categoría y Año
+        tabla_dinamica = (
+            df_filtrado.groupby(["Establecimiento", "Año"], as_index=False)["Valor"]
+            .sum()
+            .rename(columns={"Establecimiento": "Categoría", "Valor": "Suma de Valor"})
+        )
+        
+        # 3. Unir totales para ordenar: Categoría por mayor gasto total, y Año descendente (2026 -> 2025 -> 2024)
+        tabla_dinamica = tabla_dinamica.merge(cat_totals, left_on="Categoría", right_on="Establecimiento")
+        tabla_dinamica = (
+            tabla_dinamica.sort_values(by=["Cat_Total", "Año"], ascending=[False, False])
+            .drop(columns=["Establecimiento", "Cat_Total"])
+        )
         tabla_dinamica["Año"] = tabla_dinamica["Año"].astype(str) 
         st.markdown(render_excel_table(tabla_dinamica), unsafe_allow_html=True)
 
 with tab_tarjeta:
     if not df_filtrado.empty:
-        tabla_tarjeta = df_filtrado.groupby(["Tarjeta", "Año"], as_index=False)["Valor"].sum().rename(columns={"Valor": "Suma de Valor"}).sort_values(by=["Tarjeta", "Año"])
+        # Ordenado por Tarjeta (alfabético) y luego Año descendente (2026 -> 2025 -> 2024)
+        tabla_tarjeta = (
+            df_filtrado.groupby(["Tarjeta", "Año"], as_index=False)["Valor"]
+            .sum()
+            .rename(columns={"Valor": "Suma de Valor"})
+            .sort_values(by=["Tarjeta", "Año"], ascending=[True, False])
+        )
         tabla_tarjeta["Año"] = tabla_tarjeta["Año"].astype(str)
         fila_tot = pd.DataFrame([{"Tarjeta": "TOTAL GENERAL", "Año": "-", "Suma de Valor": tabla_tarjeta["Suma de Valor"].sum()}])
         tabla_tarjeta_final = pd.concat([tabla_tarjeta, fila_tot], ignore_index=True)
@@ -398,7 +425,13 @@ with tab_tarjeta:
 
 with tab_categoria:
     if not df_filtrado.empty:
-        tabla_cat = df_filtrado.groupby("Establecimiento", as_index=False)["Valor"].sum().rename(columns={"Establecimiento": "Etiquetas de fila", "Valor": "Suma de Valor"}).sort_values(by="Etiquetas de fila")
+        # Ordenado descendente por gasto total (Suma de Valor de mayor a menor)
+        tabla_cat = (
+            df_filtrado.groupby("Establecimiento", as_index=False)["Valor"]
+            .sum()
+            .rename(columns={"Establecimiento": "Etiquetas de fila", "Valor": "Suma de Valor"})
+            .sort_values(by="Suma de Valor", ascending=False)
+        )
         fila_tot_cat = pd.DataFrame([{"Etiquetas de fila": "Total general", "Suma de Valor": tabla_cat["Suma de Valor"].sum()}])
         tabla_cat_final = pd.concat([tabla_cat, fila_tot_cat], ignore_index=True)
         st.markdown(render_excel_table(tabla_cat_final), unsafe_allow_html=True)
