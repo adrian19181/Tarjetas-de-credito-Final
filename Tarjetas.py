@@ -250,25 +250,48 @@ except Exception as e:
     st.error(f"Error al conectar con Google Drive: {e}")
     st.stop()
 
-# Fecha máxima del dataset global (para calcular días reales del año en curso)
-max_dataset_date = df_raw["Fecha"].max() if not df_raw.empty else pd.Timestamp.now()
+# ---------------------------------------------------------
+# FUNCIÓN DINÁMICA DE CÁLCULO DE DÍAS REALES
+# ---------------------------------------------------------
+def calculate_days_for_period(df_subset, year=None, entity_first_date=None):
+    now = pd.Timestamp.now().normalize()
+    current_year = now.year
 
-# ---------------------------------------------------------
-# HELPERS DE CÁLCULO DE DÍAS REALES POR CALENDARIO
-# ---------------------------------------------------------
-def get_days_in_year(year, max_date):
-    max_year = max_date.year
-    if year < max_year:
-        return 366 if calendar.isleap(int(year)) else 365
-    elif year == max_year:
+    if year is not None:
+        year = int(year)
         jan1 = pd.Timestamp(f"{year}-01-01")
-        return max((max_date - jan1).days + 1, 1)
-    else:
-        return 365
+        dec31 = pd.Timestamp(f"{year}-12-31")
+        
+        # Fecha de inicio: la primera compra registrada si es en el mismo año, o 01 de enero
+        if entity_first_date is not None and pd.notnull(entity_first_date):
+            start_date = max(jan1, pd.Timestamp(entity_first_date).normalize())
+        else:
+            min_in_sub = df_subset["Fecha"].min().normalize() if not df_subset.empty else jan1
+            start_date = max(jan1, min_in_sub)
+            
+        # Fecha fin: si es el año actual, usas la fecha de hoy dinámicamente; si es un año pasado, 31 de dic
+        if year == current_year:
+            end_date = min(dec31, now)
+        elif year < current_year:
+            end_date = dec31
+        else:
+            end_date = now
 
-def get_total_days_for_years(years_series, max_date):
-    unique_years = years_series.unique()
-    return sum(get_days_in_year(int(y), max_date) for y in unique_years)
+        days = (end_date - start_date).days + 1
+        return max(days, 1)
+    else:
+        if df_subset.empty:
+            return 1
+        start_date = df_subset["Fecha"].min().normalize()
+        max_date_sub = df_subset["Fecha"].max().normalize()
+        
+        if max_date_sub.year == current_year:
+            end_date = now
+        else:
+            end_date = max_date_sub
+            
+        days = (end_date - start_date).days + 1
+        return max(days, 1)
 
 # ---------------------------------------------------------
 # HELPER: GENERADOR DE TABLAS ESTILO EXCEL
@@ -341,7 +364,8 @@ if df_filtrado.empty:
 else:
     for tarjeta, g in df_filtrado.groupby("Tarjeta"):
         c_total = g["Valor"].sum()
-        n_dias = get_total_days_for_years(g["Año"], max_dataset_date)
+        card_first_date = df_raw[df_raw["Tarjeta"] == tarjeta]["Fecha"].min().normalize()
+        n_dias = calculate_days_for_period(g, year=None, entity_first_date=card_first_date)
         gasto_dia = c_total / n_dias if n_dias > 0 else 0.0
         st.markdown(
             f"""
@@ -360,7 +384,7 @@ else:
         )
 
     tot_consumo = df_filtrado["Valor"].sum()
-    tot_dias = get_total_days_for_years(df_filtrado["Año"], max_dataset_date) if not df_filtrado.empty else 1
+    tot_dias = calculate_days_for_period(df_filtrado, year=None)
     tot_gasto_dia = tot_consumo / tot_dias if tot_dias > 0 else 0.0
     st.markdown(
         f"""
@@ -379,7 +403,7 @@ else:
     )
 
 # =========================================================
-# SECCIÓN 1: TABLAS (REGLA DEL GASTO REAL DIARIO POR DÍA)
+# SECCIÓN 1: TABLAS (FÓRMULA DINÁMICA DE DÍAS REALES)
 # =========================================================
 st.markdown("---")
 st.markdown("<h3 style='color: #FFFFFF !important;'>📋 Tablas de Detalles</h3>", unsafe_allow_html=True)
@@ -388,19 +412,21 @@ tab_anio, tab_cat_anio, tab_tarjeta, tab_categoria = st.tabs(["Año \\ Valor", "
 
 with tab_anio:
     if not df_filtrado.empty:
-        tabla_anio = (
-            df_filtrado.groupby("Año", as_index=False)["Valor"]
-            .sum()
-            .rename(columns={"Año": "Etiquetas de fila", "Valor": "Suma de Valor"})
-        )
-        tabla_anio["Gasto / Día"] = tabla_anio.apply(
-            lambda r: r["Suma de Valor"] / get_days_in_year(int(r["Etiquetas de fila"]), max_dataset_date), axis=1
-        )
-        tabla_anio = tabla_anio.sort_values(by="Etiquetas de fila", ascending=False)
-        tabla_anio["Etiquetas de fila"] = tabla_anio["Etiquetas de fila"].astype(str)
+        records_anio = []
+        for anio_val, g_anio in df_filtrado.groupby("Año"):
+            val_sum = g_anio["Valor"].sum()
+            n_dias = calculate_days_for_period(g_anio, year=anio_val, entity_first_date=g_anio["Fecha"].min())
+            records_anio.append({
+                "Etiquetas de fila": str(anio_val),
+                "Suma de Valor": val_sum,
+                "Gasto / Día": val_sum / n_dias if n_dias > 0 else 0.0,
+                "_year_int": int(anio_val)
+            })
+        
+        tabla_anio = pd.DataFrame(records_anio).sort_values(by="_year_int", ascending=False).drop(columns=["_year_int"])
 
         tot_val = tabla_anio["Suma de Valor"].sum()
-        tot_dias_tabla = get_total_days_for_years(df_filtrado["Año"], max_dataset_date) if not df_filtrado.empty else 1
+        tot_dias_tabla = calculate_days_for_period(df_filtrado, year=None)
 
         fila_total = pd.DataFrame([{
             "Etiquetas de fila": "Total general",
@@ -413,40 +439,51 @@ with tab_anio:
 
 with tab_cat_anio:
     if not df_filtrado.empty:
-        cat_totals = df_filtrado.groupby("Establecimiento")["Valor"].sum().reset_index().rename(columns={"Valor": "Cat_Total"})
-        
-        tabla_dinamica = (
-            df_filtrado.groupby(["Establecimiento", "Año"], as_index=False)["Valor"]
-            .sum()
-            .rename(columns={"Establecimiento": "Categoría", "Valor": "Suma de Valor"})
-        )
-        tabla_dinamica["Gasto / Día"] = tabla_dinamica.apply(
-            lambda r: r["Suma de Valor"] / get_days_in_year(int(r["Año"]), max_dataset_date), axis=1
-        )
+        cat_first_dates = df_raw.groupby("Establecimiento")["Fecha"].min().to_dict()
+        cat_totals = df_filtrado.groupby("Establecimiento")["Valor"].sum().to_dict()
 
-        tabla_dinamica = tabla_dinamica.merge(cat_totals, left_on="Categoría", right_on="Establecimiento")
+        records_cat_anio = []
+        for (cat, anio_val), g_sub in df_filtrado.groupby(["Establecimiento", "Año"]):
+            val_sum = g_sub["Valor"].sum()
+            f_first = cat_first_dates.get(cat, g_sub["Fecha"].min())
+            n_dias = calculate_days_for_period(g_sub, year=anio_val, entity_first_date=f_first)
+            records_cat_anio.append({
+                "Categoría": cat,
+                "Año": str(anio_val),
+                "Suma de Valor": val_sum,
+                "Gasto / Día": val_sum / n_dias if n_dias > 0 else 0.0,
+                "_cat_total": cat_totals.get(cat, 0.0),
+                "_year_int": int(anio_val)
+            })
+        
+        tabla_dinamica = pd.DataFrame(records_cat_anio)
         tabla_dinamica = (
-            tabla_dinamica.sort_values(by=["Cat_Total", "Año"], ascending=[False, False])
-            .drop(columns=["Establecimiento", "Cat_Total"])
+            tabla_dinamica.sort_values(by=["_cat_total", "_year_int"], ascending=[False, False])
+            .drop(columns=["_cat_total", "_year_int"])
         )
-        tabla_dinamica["Año"] = tabla_dinamica["Año"].astype(str) 
         st.markdown(render_excel_table(tabla_dinamica[["Categoría", "Año", "Suma de Valor", "Gasto / Día"]]), unsafe_allow_html=True)
 
 with tab_tarjeta:
     if not df_filtrado.empty:
-        tabla_tarjeta = (
-            df_filtrado.groupby(["Tarjeta", "Año"], as_index=False)["Valor"]
-            .sum()
-            .rename(columns={"Valor": "Suma de Valor"})
-        )
-        tabla_tarjeta["Gasto / Día"] = tabla_tarjeta.apply(
-            lambda r: r["Suma de Valor"] / get_days_in_year(int(r["Año"]), max_dataset_date), axis=1
-        )
-        tabla_tarjeta = tabla_tarjeta.sort_values(by=["Tarjeta", "Año"], ascending=[True, False])
-        tabla_tarjeta["Año"] = tabla_tarjeta["Año"].astype(str)
+        card_first_dates = df_raw.groupby("Tarjeta")["Fecha"].min().to_dict()
+
+        records_tarjeta_anio = []
+        for (card, anio_val), g_sub in df_filtrado.groupby(["Tarjeta", "Año"]):
+            val_sum = g_sub["Valor"].sum()
+            f_first = card_first_dates.get(card, g_sub["Fecha"].min())
+            n_dias = calculate_days_for_period(g_sub, year=anio_val, entity_first_date=f_first)
+            records_tarjeta_anio.append({
+                "Tarjeta": card,
+                "Año": str(anio_val),
+                "Suma de Valor": val_sum,
+                "Gasto / Día": val_sum / n_dias if n_dias > 0 else 0.0,
+                "_year_int": int(anio_val)
+            })
+        
+        tabla_tarjeta = pd.DataFrame(records_tarjeta_anio).sort_values(by=["Tarjeta", "_year_int"], ascending=[True, False]).drop(columns=["_year_int"])
 
         tot_val = tabla_tarjeta["Suma de Valor"].sum()
-        tot_dias_tabla = get_total_days_for_years(df_filtrado["Año"], max_dataset_date) if not df_filtrado.empty else 1
+        tot_dias_tabla = calculate_days_for_period(df_filtrado, year=None)
 
         fila_tot = pd.DataFrame([{
             "Tarjeta": "TOTAL GENERAL",
@@ -459,17 +496,24 @@ with tab_tarjeta:
 
 with tab_categoria:
     if not df_filtrado.empty:
-        tot_dias_filtro = get_total_days_for_years(df_filtrado["Año"], max_dataset_date) if not df_filtrado.empty else 1
+        cat_first_dates = df_raw.groupby("Establecimiento")["Fecha"].min().to_dict()
 
-        tabla_cat = (
-            df_filtrado.groupby("Establecimiento", as_index=False)["Valor"]
-            .sum()
-            .rename(columns={"Establecimiento": "Etiquetas de fila", "Valor": "Suma de Valor"})
-        )
-        tabla_cat["Gasto / Día"] = tabla_cat["Suma de Valor"] / tot_dias_filtro if tot_dias_filtro > 0 else 0.0
-        tabla_cat = tabla_cat.sort_values(by="Suma de Valor", ascending=False)
+        records_cat = []
+        for cat, g_sub in df_filtrado.groupby("Establecimiento"):
+            val_sum = g_sub["Valor"].sum()
+            f_first = cat_first_dates.get(cat, g_sub["Fecha"].min())
+            n_dias = calculate_days_for_period(g_sub, year=None, entity_first_date=f_first)
+            records_cat.append({
+                "Etiquetas de fila": cat,
+                "Suma de Valor": val_sum,
+                "Gasto / Día": val_sum / n_dias if n_dias > 0 else 0.0
+            })
+        
+        tabla_cat = pd.DataFrame(records_cat).sort_values(by="Suma de Valor", ascending=False)
 
         tot_val = tabla_cat["Suma de Valor"].sum()
+        tot_dias_filtro = calculate_days_for_period(df_filtrado, year=None)
+
         fila_tot_cat = pd.DataFrame([{
             "Etiquetas de fila": "Total general",
             "Suma de Valor": tot_val,
