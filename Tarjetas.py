@@ -8,6 +8,7 @@ import requests
 import pandas as pd
 import plotly.express as px
 import streamlit as st
+import streamlit.components.v1 as components
 
 # ---------------------------------------------------------
 # CONFIGURACIÓN DE PÁGINA
@@ -20,7 +21,29 @@ st.set_page_config(
 )
 
 # ---------------------------------------------------------
-# ESTILOS CSS PERSONALIZADOS (MODO OSCURO Y FIX POPOVER)
+# SCRIPT INVISIBLE: CIERRE AUTOMÁTICO DEL DESPLEGABLE
+# ---------------------------------------------------------
+# Al tocar cualquier opción dentro del popover, simula la tecla Escape
+# para replegar la lista automáticamente de inmediato.
+components.html(
+    """
+    <script>
+    const doc = window.parent.document;
+    doc.addEventListener('change', function(e) {
+        if (e.target.closest('div[data-testid="stPopoverBody"]') || e.target.closest('div[data-baseweb="popover"]')) {
+            setTimeout(function() {
+                doc.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', keyCode: 27, bubbles: true, cancelable: true }));
+            }, 120);
+        }
+    });
+    </script>
+    """,
+    height=0,
+    width=0,
+)
+
+# ---------------------------------------------------------
+# ESTILOS CSS PERSONALIZADOS (MODO OSCURO Y FIX BOTÓN FILTRO)
 # ---------------------------------------------------------
 st.markdown(
     """
@@ -44,12 +67,42 @@ st.markdown(
              pointer-events: auto !important;
         }
 
-        /* 🎨 FIX PARA LA VENTANA FLOTANTE DEL POPOVER (MODO OSCURO) 🎨 */
+        /* 🎨 FIX ABSOLUTO PARA EL BOTÓN DEL FILTRO (NUNCA MÁS BLANCO) 🎨 */
+        div[data-testid="stPopover"], 
+        div[data-testid="stPopover"] > button,
+        button[data-testid="stPopoverButton"] {
+            background-color: #1E222B !important;
+            background: #1E222B !important;
+            border: 1.8px solid #00D1B2 !important;
+            border-radius: 10px !important;
+            width: 100% !important;
+            box-shadow: 0 4px 12px rgba(0, 209, 178, 0.15) !important;
+        }
+
+        div[data-testid="stPopover"] button *,
+        div[data-testid="stPopover"] span,
+        div[data-testid="stPopover"] p,
+        button[data-testid="stPopoverButton"] * {
+            color: #FFFFFF !important;
+            -webkit-text-fill-color: #FFFFFF !important;
+            font-weight: 700 !important;
+            font-size: 0.98rem !important;
+        }
+
+        div[data-testid="stPopover"] button:hover,
+        button[data-testid="stPopoverButton"]:hover {
+            background-color: #107C41 !important;
+            background: #107C41 !important;
+            border-color: #107C41 !important;
+        }
+
+        /* Ventana flotante de la lista */
         div[data-baseweb="popover"], div[data-testid="stPopoverBody"] {
             background-color: #1E222B !important;
             border: 1.5px solid #00D1B2 !important;
             border-radius: 12px !important;
             padding: 10px !important;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6) !important;
         }
         div[data-baseweb="popover"] *, div[data-testid="stPopoverBody"] * {
             color: #FAFAFA !important;
@@ -109,7 +162,7 @@ st.markdown(
             opacity: 1 !important;
         }
 
-        div[data-testid="stButton"] > button, div[data-testid="stDownloadButton"] > button, div[data-testid="stPopover"] > button {
+        div[data-testid="stButton"] > button, div[data-testid="stDownloadButton"] > button {
             background-color: #1E222B !important;
             border: 1.5px solid #107C41 !important;
             border-radius: 8px !important;
@@ -117,16 +170,16 @@ st.markdown(
             margin-top: 6px;
             width: 100% !important; 
         }
-        div[data-testid="stButton"] > button *, div[data-testid="stDownloadButton"] > button *, div[data-testid="stPopover"] > button * {
+        div[data-testid="stButton"] > button *, div[data-testid="stDownloadButton"] > button * {
             color: #FFFFFF !important;
             -webkit-text-fill-color: #FFFFFF !important;
             font-weight: 700 !important;
         }
-        div[data-testid="stButton"] > button:hover, div[data-testid="stDownloadButton"] > button:hover, div[data-testid="stPopover"] > button:hover {
+        div[data-testid="stButton"] > button:hover, div[data-testid="stDownloadButton"] > button:hover {
             background-color: #107C41 !important;
             border-color: #107C41 !important;
         }
-        div[data-testid="stButton"] > button:hover *, div[data-testid="stDownloadButton"] > button:hover *, div[data-testid="stPopover"] > button:hover * {
+        div[data-testid="stButton"] > button:hover *, div[data-testid="stDownloadButton"] > button:hover * {
             color: #FFFFFF !important;
             -webkit-text-fill-color: #FFFFFF !important;
         }
@@ -333,7 +386,7 @@ with tab_categoria:
 
 
 # =========================================================
-# SECCIÓN 2: GRÁFICOS OPTIMIZADOS (ZOOM Y TECLADO BLOQUEADOS)
+# SECCIÓN 2: GRÁFICOS OPTIMIZADOS
 # =========================================================
 st.markdown("---")
 st.markdown("<h3 style='color: #FFFFFF !important;'>📊 Gráficos Dinámicos</h3>", unsafe_allow_html=True)
