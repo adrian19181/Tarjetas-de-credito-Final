@@ -20,7 +20,7 @@ st.set_page_config(
 )
 
 # ---------------------------------------------------------
-# ESTILOS CSS PERSONALIZADOS (MODO OSCURO, OPTIMIZADO TÁCTIL)
+# ESTILOS CSS PERSONALIZADOS (MODO OSCURO Y BLOQUEO DE TECLADO)
 # ---------------------------------------------------------
 st.markdown(
     """
@@ -32,14 +32,14 @@ st.markdown(
         [data-testid="stHeader"] { background-color: rgba(0, 0, 0, 0) !important; }
         .block-container { padding: 1.2rem 0.8rem 2rem 0.8rem; max-width: 740px; }
 
-        /* Evitar zoom automático e invocación accidental del teclado en móviles */
-        input, select, textarea, [data-baseweb="select"] {
-            font-size: 16px !important;
-            pointer-events: none !important; /* Desactiva interacción que llame al teclado */
+        /* 🚫 BLOQUEO DEFINITIVO DEL TECLADO EN MÓVILES 🚫 */
+        /* Bloquea la entrada de texto en los filtros (selectbox) para que solo funcionen como listas desplegables */
+        div[data-baseweb="select"] input {
+            pointer-events: none !important;
+            caret-color: transparent !important;
         }
-        
-        /* Habilitar interacción solo para los selectbox y radio buttons explícitamente */
-        div[data-testid="stSelectbox"] select, div[data-testid="stRadio"] input {
+        /* Asegura que los botones de radio sí funcionen */
+        div[data-testid="stRadio"] input {
              pointer-events: auto !important;
         }
 
