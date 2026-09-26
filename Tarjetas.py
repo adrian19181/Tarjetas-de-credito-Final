@@ -13,7 +13,7 @@ import streamlit as st
 # CONFIGURACIÓN DE PÁGINA
 # ---------------------------------------------------------
 st.set_page_config(
-    page_title="Mis Consumos",
+    page_title="Tarjetas de Credito",
     page_icon="💳",
     layout="centered",
     initial_sidebar_state="collapsed",
