@@ -332,7 +332,7 @@ plotly_config = {
     'doubleClick': False,
     'showAxisDragHandles': False,
     'showAxisRangeEntryBoxes': False,
-    'staticPlot': True # Esto convierte el gráfico en una imagen estática, bloqueando toda interacción.
+    'staticPlot': True # Convierte el gráfico en imagen estática para cero conflictos táctiles.
 }
 
 def wrap_labels(text, width=18):
@@ -366,9 +366,11 @@ with tab_grafico_evolucion_anual:
             st.markdown(f"<h5 style='color: #38BDF8; text-align: center;'>Evolución del Gasto: {est_seleccionado}</h5>", unsafe_allow_html=True)
 
             fig_evo_anual = px.bar(df_evo_anual, x="Valor", y="Año", orientation="h", template="plotly_dark", text="Valor")
+            
+            # CORRECCIÓN: Textposition="outside" y cliponaxis=False para evitar superposiciones
             fig_evo_anual.update_traces(
-                marker_color="#38BDF8", texttemplate="$%{x:,.2f}", textposition="inside", 
-                textfont=dict(color="#FFFFFF", size=13, family="sans-serif")
+                marker_color="#38BDF8", texttemplate="$%{x:,.2f}", textposition="outside", 
+                cliponaxis=False, textfont=dict(color="#FFFFFF", size=11, family="sans-serif")
             )
             # Bloqueo estricto de zoom y movimiento de ejes
             fig_evo_anual.update_xaxes(fixedrange=True)
@@ -376,9 +378,11 @@ with tab_grafico_evolucion_anual:
             fig_evo_anual.update_layout(
                 dragmode=False,
                 paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-                xaxis=dict(title="", showticklabels=False, range=[0, max_evo * 1.05]),
+                # Aumento del rango a 1.35 para que entre el texto externo
+                xaxis=dict(title="", showticklabels=False, range=[0, max_evo * 1.35]),
                 yaxis=dict(title="", type='category', tickfont=dict(color="#FFFFFF", size=12)), 
-                margin=dict(l=45, r=10, t=10, b=10),
+                # Margen derecho ampliado (r=40) para acomodar los números a la derecha
+                margin=dict(l=45, r=40, t=10, b=10),
                 height=250,
             )
             st.plotly_chart(fig_evo_anual, use_container_width=True, theme=None, config=plotly_config)
