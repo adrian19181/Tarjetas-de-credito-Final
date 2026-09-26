@@ -4,6 +4,7 @@ import subprocess
 import socket
 import io
 import textwrap
+import calendar
 import requests
 import pandas as pd
 import plotly.express as px
@@ -41,7 +42,7 @@ components.html(
 )
 
 # ---------------------------------------------------------
-# ESTILOS CSS PERSONALIZADOS (TABS SIEMPRE VISIBLES Y DESTACADOS)
+# ESTILOS CSS PERSONALIZADOS
 # ---------------------------------------------------------
 st.markdown(
     """
@@ -53,13 +54,11 @@ st.markdown(
         [data-testid="stHeader"] { background-color: rgba(0, 0, 0, 0) !important; }
         .block-container { padding: 1.2rem 0.8rem 2rem 0.8rem; max-width: 740px; }
 
-        /* ✨ CORRECCIÓN TOTAL DE PESTAÑAS (TABS) ✨ */
         div[data-testid="stTabs"] [data-baseweb="tab-list"] {
             background-color: transparent !important;
             gap: 6px !important;
         }
 
-        /* TODAS LAS PESTAÑAS INACTIVAS: Fondo oscuro + Texto Blanco Puro */
         div[data-testid="stTabs"] button[role="tab"],
         div[data-testid="stTabs"] button[data-baseweb="tab"] {
             background-color: #1E222B !important;
@@ -82,7 +81,6 @@ st.markdown(
             visibility: visible !important;
         }
 
-        /* PESTAÑA ACTIVA SELECCIONADA: Resalta en Turquesa Neón */
         div[data-testid="stTabs"] button[role="tab"][aria-selected="true"],
         div[data-testid="stTabs"] button[data-baseweb="tab"][aria-selected="true"] {
             background-color: #14171E !important;
@@ -98,7 +96,6 @@ st.markdown(
             font-weight: 800 !important;
         }
 
-        /* 🎨 BOTÓN PRINCIPAL DEL FILTRO (POPOVER) 🎨 */
         div[data-testid="stPopover"], 
         div[data-testid="stPopover"] > button,
         button[data-testid="stPopoverButton"] {
@@ -127,7 +124,6 @@ st.markdown(
             border-color: #107C41 !important;
         }
 
-        /* 📱 CAJA FLOTANTE OPCIÓN 1 📱 */
         div[data-baseweb="popover"], div[data-testid="stPopoverBody"] {
             background-color: #1E222B !important;
             border: 1.8px solid #00D1B2 !important;
@@ -220,6 +216,61 @@ st.markdown(
 )
 
 # ---------------------------------------------------------
+# CONEXIÓN GOOGLE DRIVE & CARGA DE DATOS
+# ---------------------------------------------------------
+EXCEL_URL = "https://drive.google.com/uc?export=download&id=1UpW_wHsvth7zf-vSHfRmqvVpqqHWJukG"
+
+@st.cache_data(ttl=300)
+def load_credit_card_data():
+    response = requests.get(EXCEL_URL, timeout=30)
+    response.raise_for_status()
+    df = pd.read_excel(io.BytesIO(response.content), sheet_name="Todas las Tarjetas", usecols="A:E")
+    df.columns = [str(c).strip() for c in df.columns]
+
+    rename_map = {}
+    for col in df.columns:
+        if "Establecimiento" in col: rename_map[col] = "Establecimiento"
+        elif "Terminada" in col: rename_map[col] = "Tarjeta Terminada en"
+    df = df.rename(columns=rename_map)
+
+    for text_col in ["Tarjeta", "Establecimiento"]:
+        if text_col in df.columns:
+            df[text_col] = df[text_col].astype(str).str.replace(r"[\r\n]|_x000D_", "", regex=True).str.strip()
+
+    df["Valor"] = pd.to_numeric(df["Valor"], errors="coerce").fillna(0.0)
+    df["Fecha"] = pd.to_datetime(df["Fecha"], errors="coerce")
+    df = df.dropna(subset=["Fecha"]).copy()
+    df["Año"] = df["Fecha"].dt.year.astype(int)
+    return df.sort_values(by="Fecha", ascending=False).reset_index(drop=True)
+
+try:
+    with st.spinner("Cargando consumos desde Google Drive..."):
+        df_raw = load_credit_card_data()
+except Exception as e:
+    st.error(f"Error al conectar con Google Drive: {e}")
+    st.stop()
+
+# Fecha máxima del dataset global (para calcular días reales del año en curso)
+max_dataset_date = df_raw["Fecha"].max() if not df_raw.empty else pd.Timestamp.now()
+
+# ---------------------------------------------------------
+# HELPERS DE CÁLCULO DE DÍAS REALES POR CALENDARIO
+# ---------------------------------------------------------
+def get_days_in_year(year, max_date):
+    max_year = max_date.year
+    if year < max_year:
+        return 366 if calendar.isleap(int(year)) else 365
+    elif year == max_year:
+        jan1 = pd.Timestamp(f"{year}-01-01")
+        return max((max_date - jan1).days + 1, 1)
+    else:
+        return 365
+
+def get_total_days_for_years(years_series, max_date):
+    unique_years = years_series.unique()
+    return sum(get_days_in_year(int(y), max_date) for y in unique_years)
+
+# ---------------------------------------------------------
 # HELPER: GENERADOR DE TABLAS ESTILO EXCEL
 # ---------------------------------------------------------
 def render_excel_table(df, currency_cols=None):
@@ -258,41 +309,6 @@ def render_excel_table(df, currency_cols=None):
     return html
 
 # ---------------------------------------------------------
-# CONEXIÓN GOOGLE DRIVE & CARGA DE DATOS
-# ---------------------------------------------------------
-EXCEL_URL = "https://drive.google.com/uc?export=download&id=1UpW_wHsvth7zf-vSHfRmqvVpqqHWJukG"
-
-@st.cache_data(ttl=300)
-def load_credit_card_data():
-    response = requests.get(EXCEL_URL, timeout=30)
-    response.raise_for_status()
-    df = pd.read_excel(io.BytesIO(response.content), sheet_name="Todas las Tarjetas", usecols="A:E")
-    df.columns = [str(c).strip() for c in df.columns]
-
-    rename_map = {}
-    for col in df.columns:
-        if "Establecimiento" in col: rename_map[col] = "Establecimiento"
-        elif "Terminada" in col: rename_map[col] = "Tarjeta Terminada en"
-    df = df.rename(columns=rename_map)
-
-    for text_col in ["Tarjeta", "Establecimiento"]:
-        if text_col in df.columns:
-            df[text_col] = df[text_col].astype(str).str.replace(r"[\r\n]|_x000D_", "", regex=True).str.strip()
-
-    df["Valor"] = pd.to_numeric(df["Valor"], errors="coerce").fillna(0.0)
-    df["Fecha"] = pd.to_datetime(df["Fecha"], errors="coerce")
-    df = df.dropna(subset=["Fecha"]).copy()
-    df["Año"] = df["Fecha"].dt.year.astype(int)
-    return df.sort_values(by="Fecha", ascending=False).reset_index(drop=True)
-
-try:
-    with st.spinner("Cargando consumos desde Google Drive..."):
-        df_raw = load_credit_card_data()
-except Exception as e:
-    st.error(f"Error al conectar con Google Drive: {e}")
-    st.stop()
-
-# ---------------------------------------------------------
 # CABECERA & BOTÓN REFRESCAR
 # ---------------------------------------------------------
 header_col1, header_col2 = st.columns([2.5, 1.5], vertical_alignment="center")
@@ -325,8 +341,7 @@ if df_filtrado.empty:
 else:
     for tarjeta, g in df_filtrado.groupby("Tarjeta"):
         c_total = g["Valor"].sum()
-        f_min, f_max = g["Fecha"].min(), g["Fecha"].max()
-        n_dias = (f_max - f_min).days + 1
+        n_dias = get_total_days_for_years(g["Año"], max_dataset_date)
         gasto_dia = c_total / n_dias if n_dias > 0 else 0.0
         st.markdown(
             f"""
@@ -345,7 +360,7 @@ else:
         )
 
     tot_consumo = df_filtrado["Valor"].sum()
-    tot_dias = (df_filtrado["Fecha"].max() - df_filtrado["Fecha"].min()).days + 1 if not df_filtrado.empty else 0
+    tot_dias = get_total_days_for_years(df_filtrado["Año"], max_dataset_date) if not df_filtrado.empty else 1
     tot_gasto_dia = tot_consumo / tot_dias if tot_dias > 0 else 0.0
     st.markdown(
         f"""
@@ -364,7 +379,7 @@ else:
     )
 
 # =========================================================
-# SECCIÓN 1: TABLAS (CON TERCERA COLUMNA "GASTO / DÍA")
+# SECCIÓN 1: TABLAS (REGLA DEL GASTO REAL DIARIO POR DÍA)
 # =========================================================
 st.markdown("---")
 st.markdown("<h3 style='color: #FFFFFF !important;'>📋 Tablas de Detalles</h3>", unsafe_allow_html=True)
@@ -374,27 +389,23 @@ tab_anio, tab_cat_anio, tab_tarjeta, tab_categoria = st.tabs(["Año \\ Valor", "
 with tab_anio:
     if not df_filtrado.empty:
         tabla_anio = (
-            df_filtrado.groupby("Año", as_index=False)
-            .agg(
-                Suma_Valor=("Valor", "sum"),
-                Min_Fecha=("Fecha", "min"),
-                Max_Fecha=("Fecha", "max")
-            )
+            df_filtrado.groupby("Año", as_index=False)["Valor"]
+            .sum()
+            .rename(columns={"Año": "Etiquetas de fila", "Valor": "Suma de Valor"})
         )
-        tabla_anio["Dias"] = (tabla_anio["Max_Fecha"] - tabla_anio["Min_Fecha"]).dt.days + 1
-        tabla_anio["Gasto / Día"] = tabla_anio["Suma_Valor"] / tabla_anio["Dias"]
-        tabla_anio = tabla_anio.rename(columns={"Año": "Etiquetas de fila", "Suma_Valor": "Suma de Valor"})
+        tabla_anio["Gasto / Día"] = tabla_anio.apply(
+            lambda r: r["Suma de Valor"] / get_days_in_year(int(r["Etiquetas de fila"]), max_dataset_date), axis=1
+        )
         tabla_anio = tabla_anio.sort_values(by="Etiquetas de fila", ascending=False)
         tabla_anio["Etiquetas de fila"] = tabla_anio["Etiquetas de fila"].astype(str)
 
         tot_val = tabla_anio["Suma de Valor"].sum()
-        tot_dias = (df_filtrado["Fecha"].max() - df_filtrado["Fecha"].min()).days + 1 if not df_filtrado.empty else 1
-        tot_gasto_dia = tot_val / tot_dias if tot_dias > 0 else 0.0
+        tot_dias_tabla = get_total_days_for_years(df_filtrado["Año"], max_dataset_date) if not df_filtrado.empty else 1
 
         fila_total = pd.DataFrame([{
             "Etiquetas de fila": "Total general",
             "Suma de Valor": tot_val,
-            "Gasto / Día": tot_gasto_dia
+            "Gasto / Día": tot_val / tot_dias_tabla if tot_dias_tabla > 0 else 0.0
         }])
 
         tabla_anio_final = pd.concat([tabla_anio[["Etiquetas de fila", "Suma de Valor", "Gasto / Día"]], fila_total], ignore_index=True)
@@ -405,16 +416,13 @@ with tab_cat_anio:
         cat_totals = df_filtrado.groupby("Establecimiento")["Valor"].sum().reset_index().rename(columns={"Valor": "Cat_Total"})
         
         tabla_dinamica = (
-            df_filtrado.groupby(["Establecimiento", "Año"], as_index=False)
-            .agg(
-                Suma_Valor=("Valor", "sum"),
-                Min_Fecha=("Fecha", "min"),
-                Max_Fecha=("Fecha", "max")
-            )
+            df_filtrado.groupby(["Establecimiento", "Año"], as_index=False)["Valor"]
+            .sum()
+            .rename(columns={"Establecimiento": "Categoría", "Valor": "Suma de Valor"})
         )
-        tabla_dinamica["Dias"] = (tabla_dinamica["Max_Fecha"] - tabla_dinamica["Min_Fecha"]).dt.days + 1
-        tabla_dinamica["Gasto / Día"] = tabla_dinamica["Suma_Valor"] / tabla_dinamica["Dias"]
-        tabla_dinamica = tabla_dinamica.rename(columns={"Establecimiento": "Categoría", "Suma_Valor": "Suma de Valor"})
+        tabla_dinamica["Gasto / Día"] = tabla_dinamica.apply(
+            lambda r: r["Suma de Valor"] / get_days_in_year(int(r["Año"]), max_dataset_date), axis=1
+        )
 
         tabla_dinamica = tabla_dinamica.merge(cat_totals, left_on="Categoría", right_on="Establecimiento")
         tabla_dinamica = (
@@ -427,55 +435,45 @@ with tab_cat_anio:
 with tab_tarjeta:
     if not df_filtrado.empty:
         tabla_tarjeta = (
-            df_filtrado.groupby(["Tarjeta", "Año"], as_index=False)
-            .agg(
-                Suma_Valor=("Valor", "sum"),
-                Min_Fecha=("Fecha", "min"),
-                Max_Fecha=("Fecha", "max")
-            )
+            df_filtrado.groupby(["Tarjeta", "Año"], as_index=False)["Valor"]
+            .sum()
+            .rename(columns={"Valor": "Suma de Valor"})
         )
-        tabla_tarjeta["Dias"] = (tabla_tarjeta["Max_Fecha"] - tabla_tarjeta["Min_Fecha"]).dt.days + 1
-        tabla_tarjeta["Gasto / Día"] = tabla_tarjeta["Suma_Valor"] / tabla_tarjeta["Dias"]
-        tabla_tarjeta = tabla_tarjeta.rename(columns={"Suma_Valor": "Suma de Valor"})
+        tabla_tarjeta["Gasto / Día"] = tabla_tarjeta.apply(
+            lambda r: r["Suma de Valor"] / get_days_in_year(int(r["Año"]), max_dataset_date), axis=1
+        )
         tabla_tarjeta = tabla_tarjeta.sort_values(by=["Tarjeta", "Año"], ascending=[True, False])
         tabla_tarjeta["Año"] = tabla_tarjeta["Año"].astype(str)
 
         tot_val = tabla_tarjeta["Suma de Valor"].sum()
-        tot_dias = (df_filtrado["Fecha"].max() - df_filtrado["Fecha"].min()).days + 1 if not df_filtrado.empty else 1
-        tot_gasto_dia = tot_val / tot_dias if tot_dias > 0 else 0.0
+        tot_dias_tabla = get_total_days_for_years(df_filtrado["Año"], max_dataset_date) if not df_filtrado.empty else 1
 
         fila_tot = pd.DataFrame([{
             "Tarjeta": "TOTAL GENERAL",
             "Año": "-",
             "Suma de Valor": tot_val,
-            "Gasto / Día": tot_gasto_dia
+            "Gasto / Día": tot_val / tot_dias_tabla if tot_dias_tabla > 0 else 0.0
         }])
         tabla_tarjeta_final = pd.concat([tabla_tarjeta[["Tarjeta", "Año", "Suma de Valor", "Gasto / Día"]], fila_tot], ignore_index=True)
         st.markdown(render_excel_table(tabla_tarjeta_final), unsafe_allow_html=True)
 
 with tab_categoria:
     if not df_filtrado.empty:
+        tot_dias_filtro = get_total_days_for_years(df_filtrado["Año"], max_dataset_date) if not df_filtrado.empty else 1
+
         tabla_cat = (
-            df_filtrado.groupby("Establecimiento", as_index=False)
-            .agg(
-                Suma_Valor=("Valor", "sum"),
-                Min_Fecha=("Fecha", "min"),
-                Max_Fecha=("Fecha", "max")
-            )
+            df_filtrado.groupby("Establecimiento", as_index=False)["Valor"]
+            .sum()
+            .rename(columns={"Establecimiento": "Etiquetas de fila", "Valor": "Suma de Valor"})
         )
-        tabla_cat["Dias"] = (tabla_cat["Max_Fecha"] - tabla_cat["Min_Fecha"]).dt.days + 1
-        tabla_cat["Gasto / Día"] = tabla_cat["Suma_Valor"] / tabla_cat["Dias"]
-        tabla_cat = tabla_cat.rename(columns={"Establecimiento": "Etiquetas de fila", "Suma_Valor": "Suma de Valor"})
+        tabla_cat["Gasto / Día"] = tabla_cat["Suma de Valor"] / tot_dias_filtro if tot_dias_filtro > 0 else 0.0
         tabla_cat = tabla_cat.sort_values(by="Suma de Valor", ascending=False)
 
         tot_val = tabla_cat["Suma de Valor"].sum()
-        tot_dias = (df_filtrado["Fecha"].max() - df_filtrado["Fecha"].min()).days + 1 if not df_filtrado.empty else 1
-        tot_gasto_dia = tot_val / tot_dias if tot_dias > 0 else 0.0
-
         fila_tot_cat = pd.DataFrame([{
             "Etiquetas de fila": "Total general",
             "Suma de Valor": tot_val,
-            "Gasto / Día": tot_gasto_dia
+            "Gasto / Día": tot_val / tot_dias_filtro if tot_dias_filtro > 0 else 0.0
         }])
         tabla_cat_final = pd.concat([tabla_cat[["Etiquetas de fila", "Suma de Valor", "Gasto / Día"]], fila_tot_cat], ignore_index=True)
         st.markdown(render_excel_table(tabla_cat_final), unsafe_allow_html=True)
