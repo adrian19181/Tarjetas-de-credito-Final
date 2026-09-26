@@ -299,6 +299,8 @@ with tab_anio:
 with tab_cat_anio:
     if not df_filtrado.empty:
         tabla_dinamica = df_filtrado.groupby(["Establecimiento", "Año"], as_index=False)["Valor"].sum().rename(columns={"Establecimiento": "Categoría", "Valor": "Suma de Valor"}).sort_values(by=["Categoría", "Año"])
+        # Conversión a texto para evitar comas de miles en los años
+        tabla_dinamica["Año"] = tabla_dinamica["Año"].astype(str) 
         st.markdown(render_excel_table(tabla_dinamica), unsafe_allow_html=True)
 
 with tab_tarjeta:
