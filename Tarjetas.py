@@ -53,15 +53,13 @@ st.markdown(
         [data-testid="stHeader"] { background-color: rgba(0, 0, 0, 0) !important; }
         .block-container { padding: 1.2rem 0.8rem 2rem 0.8rem; max-width: 740px; }
 
-        /* -------------------------------------------------
-           ✨ CORRECCIÓN TOTAL DE PESTAÑAS (TABS) INACTIVAS Y ACTIVAS ✨
-           ------------------------------------------------- */
+        /* ✨ CORRECCIÓN TOTAL DE PESTAÑAS (TABS) ✨ */
         div[data-testid="stTabs"] [data-baseweb="tab-list"] {
             background-color: transparent !important;
             gap: 6px !important;
         }
 
-        /* TODAS LAS PESTAÑAS INACTIVAS: Fondo oscuro + Texto Blanco Puro 100% visible */
+        /* TODAS LAS PESTAÑAS INACTIVAS: Fondo oscuro + Texto Blanco Puro */
         div[data-testid="stTabs"] button[role="tab"],
         div[data-testid="stTabs"] button[data-baseweb="tab"] {
             background-color: #1E222B !important;
@@ -84,7 +82,7 @@ st.markdown(
             visibility: visible !important;
         }
 
-        /* PESTAÑA ACTIVA SELECCIONADA: Resalta en Turquesa Neón con borde brillante */
+        /* PESTAÑA ACTIVA SELECCIONADA: Resalta en Turquesa Neón */
         div[data-testid="stTabs"] button[role="tab"][aria-selected="true"],
         div[data-testid="stTabs"] button[data-baseweb="tab"][aria-selected="true"] {
             background-color: #14171E !important;
@@ -129,7 +127,7 @@ st.markdown(
             border-color: #107C41 !important;
         }
 
-        /* 📱 CAJA FLOTANTE OPCIÓN 1 (OPCIONES TÁCTILES Y DOBLE LÍNEA) 📱 */
+        /* 📱 CAJA FLOTANTE OPCIÓN 1 📱 */
         div[data-baseweb="popover"], div[data-testid="stPopoverBody"] {
             background-color: #1E222B !important;
             border: 1.8px solid #00D1B2 !important;
@@ -159,7 +157,6 @@ st.markdown(
             font-weight: 700 !important;
         }
 
-        /* Bloquea la captura táctil de Plotly para permitir scroll de página fluido */
         .js-plotly-plot, .plotly, .plot-container, .main-svg {
             touch-action: pan-y !important;
             user-select: none !important;
@@ -227,14 +224,14 @@ st.markdown(
 # ---------------------------------------------------------
 def render_excel_table(df, currency_cols=None):
     if currency_cols is None:
-        currency_cols = ["Suma de Valor", "Valor"]
+        currency_cols = ["Suma de Valor", "Valor", "Gasto / Día"]
     html = """
     <div style="overflow-x: auto; border-radius: 10px; border: 1.5px solid #107C41; margin-top: 8px; margin-bottom: 12px; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);">
     <table style="width:100%; border-collapse: collapse; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 0.93rem; color: #FAFAFA;">
         <thead><tr style="background: linear-gradient(135deg, #107C41 0%, #0D5C30 100%); color: #FFFFFF;">
     """
     for col in df.columns:
-        align = "right" if col in currency_cols or "Suma" in col or "Valor" in col else "left"
+        align = "right" if col in currency_cols or "Suma" in col or "Valor" in col or "Día" in col else "left"
         html += f'<th style="padding: 11px 14px; border-bottom: 2px solid #1B9E52; text-align: {align}; font-weight: 700;">{col}</th>'
     html += '</tr></thead><tbody>'
 
@@ -250,9 +247,9 @@ def render_excel_table(df, currency_cols=None):
         html += f'<tr style="{row_style}">'
         for col in df.columns:
             val = row[col]
-            align = "right" if col in currency_cols or "Suma" in col or "Valor" in col or isinstance(val, (int, float)) else "left"
+            align = "right" if col in currency_cols or "Suma" in col or "Valor" in col or "Día" in col or isinstance(val, (int, float)) else "left"
             if isinstance(val, (int, float)):
-                val_str = f"${val:,.2f}" if col in currency_cols or "Suma" in col or "Valor" in col else f"{val:,}"
+                val_str = f"${val:,.2f}" if col in currency_cols or "Suma" in col or "Valor" in col or "Día" in col else f"{val:,}"
             else:
                 val_str = str(val)
             html += f'<td style="padding: 9px 14px; border-bottom: 1px solid #2A323D; text-align: {align};">{val_str}</td>'
@@ -367,7 +364,7 @@ else:
     )
 
 # =========================================================
-# SECCIÓN 1: SOLO TABLAS (ESTILO EXCEL CON ORDENACIÓN CORREGIDA)
+# SECCIÓN 1: TABLAS (CON TERCERA COLUMNA "GASTO / DÍA")
 # =========================================================
 st.markdown("---")
 st.markdown("<h3 style='color: #FFFFFF !important;'>📋 Tablas de Detalles</h3>", unsafe_allow_html=True)
@@ -376,69 +373,116 @@ tab_anio, tab_cat_anio, tab_tarjeta, tab_categoria = st.tabs(["Año \\ Valor", "
 
 with tab_anio:
     if not df_filtrado.empty:
-        # Ordenado por Año descendente (2026 -> 2025 -> 2024)
         tabla_anio = (
-            df_filtrado.groupby("Año", as_index=False)["Valor"]
-            .sum()
-            .rename(columns={"Año": "Etiquetas de fila", "Valor": "Suma de Valor"})
-            .sort_values(by="Etiquetas de fila", ascending=False)
+            df_filtrado.groupby("Año", as_index=False)
+            .agg(
+                Suma_Valor=("Valor", "sum"),
+                Min_Fecha=("Fecha", "min"),
+                Max_Fecha=("Fecha", "max")
+            )
         )
+        tabla_anio["Dias"] = (tabla_anio["Max_Fecha"] - tabla_anio["Min_Fecha"]).dt.days + 1
+        tabla_anio["Gasto / Día"] = tabla_anio["Suma_Valor"] / tabla_anio["Dias"]
+        tabla_anio = tabla_anio.rename(columns={"Año": "Etiquetas de fila", "Suma_Valor": "Suma de Valor"})
+        tabla_anio = tabla_anio.sort_values(by="Etiquetas de fila", ascending=False)
         tabla_anio["Etiquetas de fila"] = tabla_anio["Etiquetas de fila"].astype(str)
-        fila_total = pd.DataFrame([{"Etiquetas de fila": "Total general", "Suma de Valor": tabla_anio["Suma de Valor"].sum()}])
-        tabla_anio_final = pd.concat([tabla_anio, fila_total], ignore_index=True)
+
+        tot_val = tabla_anio["Suma de Valor"].sum()
+        tot_dias = (df_filtrado["Fecha"].max() - df_filtrado["Fecha"].min()).days + 1 if not df_filtrado.empty else 1
+        tot_gasto_dia = tot_val / tot_dias if tot_dias > 0 else 0.0
+
+        fila_total = pd.DataFrame([{
+            "Etiquetas de fila": "Total general",
+            "Suma de Valor": tot_val,
+            "Gasto / Día": tot_gasto_dia
+        }])
+
+        tabla_anio_final = pd.concat([tabla_anio[["Etiquetas de fila", "Suma de Valor", "Gasto / Día"]], fila_total], ignore_index=True)
         st.markdown(render_excel_table(tabla_anio_final), unsafe_allow_html=True)
 
 with tab_cat_anio:
     if not df_filtrado.empty:
-        # 1. Calcular consumo total por categoría para definir el orden de categorías
         cat_totals = df_filtrado.groupby("Establecimiento")["Valor"].sum().reset_index().rename(columns={"Valor": "Cat_Total"})
         
-        # 2. Agrupar por Categoría y Año
         tabla_dinamica = (
-            df_filtrado.groupby(["Establecimiento", "Año"], as_index=False)["Valor"]
-            .sum()
-            .rename(columns={"Establecimiento": "Categoría", "Valor": "Suma de Valor"})
+            df_filtrado.groupby(["Establecimiento", "Año"], as_index=False)
+            .agg(
+                Suma_Valor=("Valor", "sum"),
+                Min_Fecha=("Fecha", "min"),
+                Max_Fecha=("Fecha", "max")
+            )
         )
-        
-        # 3. Unir totales para ordenar: Categoría por mayor gasto total, y Año descendente (2026 -> 2025 -> 2024)
+        tabla_dinamica["Dias"] = (tabla_dinamica["Max_Fecha"] - tabla_dinamica["Min_Fecha"]).dt.days + 1
+        tabla_dinamica["Gasto / Día"] = tabla_dinamica["Suma_Valor"] / tabla_dinamica["Dias"]
+        tabla_dinamica = tabla_dinamica.rename(columns={"Establecimiento": "Categoría", "Suma_Valor": "Suma de Valor"})
+
         tabla_dinamica = tabla_dinamica.merge(cat_totals, left_on="Categoría", right_on="Establecimiento")
         tabla_dinamica = (
             tabla_dinamica.sort_values(by=["Cat_Total", "Año"], ascending=[False, False])
             .drop(columns=["Establecimiento", "Cat_Total"])
         )
         tabla_dinamica["Año"] = tabla_dinamica["Año"].astype(str) 
-        st.markdown(render_excel_table(tabla_dinamica), unsafe_allow_html=True)
+        st.markdown(render_excel_table(tabla_dinamica[["Categoría", "Año", "Suma de Valor", "Gasto / Día"]]), unsafe_allow_html=True)
 
 with tab_tarjeta:
     if not df_filtrado.empty:
-        # Ordenado por Tarjeta (alfabético) y luego Año descendente (2026 -> 2025 -> 2024)
         tabla_tarjeta = (
-            df_filtrado.groupby(["Tarjeta", "Año"], as_index=False)["Valor"]
-            .sum()
-            .rename(columns={"Valor": "Suma de Valor"})
-            .sort_values(by=["Tarjeta", "Año"], ascending=[True, False])
+            df_filtrado.groupby(["Tarjeta", "Año"], as_index=False)
+            .agg(
+                Suma_Valor=("Valor", "sum"),
+                Min_Fecha=("Fecha", "min"),
+                Max_Fecha=("Fecha", "max")
+            )
         )
+        tabla_tarjeta["Dias"] = (tabla_tarjeta["Max_Fecha"] - tabla_tarjeta["Min_Fecha"]).dt.days + 1
+        tabla_tarjeta["Gasto / Día"] = tabla_tarjeta["Suma_Valor"] / tabla_tarjeta["Dias"]
+        tabla_tarjeta = tabla_tarjeta.rename(columns={"Suma_Valor": "Suma de Valor"})
+        tabla_tarjeta = tabla_tarjeta.sort_values(by=["Tarjeta", "Año"], ascending=[True, False])
         tabla_tarjeta["Año"] = tabla_tarjeta["Año"].astype(str)
-        fila_tot = pd.DataFrame([{"Tarjeta": "TOTAL GENERAL", "Año": "-", "Suma de Valor": tabla_tarjeta["Suma de Valor"].sum()}])
-        tabla_tarjeta_final = pd.concat([tabla_tarjeta, fila_tot], ignore_index=True)
+
+        tot_val = tabla_tarjeta["Suma de Valor"].sum()
+        tot_dias = (df_filtrado["Fecha"].max() - df_filtrado["Fecha"].min()).days + 1 if not df_filtrado.empty else 1
+        tot_gasto_dia = tot_val / tot_dias if tot_dias > 0 else 0.0
+
+        fila_tot = pd.DataFrame([{
+            "Tarjeta": "TOTAL GENERAL",
+            "Año": "-",
+            "Suma de Valor": tot_val,
+            "Gasto / Día": tot_gasto_dia
+        }])
+        tabla_tarjeta_final = pd.concat([tabla_tarjeta[["Tarjeta", "Año", "Suma de Valor", "Gasto / Día"]], fila_tot], ignore_index=True)
         st.markdown(render_excel_table(tabla_tarjeta_final), unsafe_allow_html=True)
 
 with tab_categoria:
     if not df_filtrado.empty:
-        # Ordenado descendente por gasto total (Suma de Valor de mayor a menor)
         tabla_cat = (
-            df_filtrado.groupby("Establecimiento", as_index=False)["Valor"]
-            .sum()
-            .rename(columns={"Establecimiento": "Etiquetas de fila", "Valor": "Suma de Valor"})
-            .sort_values(by="Suma de Valor", ascending=False)
+            df_filtrado.groupby("Establecimiento", as_index=False)
+            .agg(
+                Suma_Valor=("Valor", "sum"),
+                Min_Fecha=("Fecha", "min"),
+                Max_Fecha=("Fecha", "max")
+            )
         )
-        fila_tot_cat = pd.DataFrame([{"Etiquetas de fila": "Total general", "Suma de Valor": tabla_cat["Suma de Valor"].sum()}])
-        tabla_cat_final = pd.concat([tabla_cat, fila_tot_cat], ignore_index=True)
+        tabla_cat["Dias"] = (tabla_cat["Max_Fecha"] - tabla_cat["Min_Fecha"]).dt.days + 1
+        tabla_cat["Gasto / Día"] = tabla_cat["Suma_Valor"] / tabla_cat["Dias"]
+        tabla_cat = tabla_cat.rename(columns={"Establecimiento": "Etiquetas de fila", "Suma_Valor": "Suma de Valor"})
+        tabla_cat = tabla_cat.sort_values(by="Suma de Valor", ascending=False)
+
+        tot_val = tabla_cat["Suma de Valor"].sum()
+        tot_dias = (df_filtrado["Fecha"].max() - df_filtrado["Fecha"].min()).days + 1 if not df_filtrado.empty else 1
+        tot_gasto_dia = tot_val / tot_dias if tot_dias > 0 else 0.0
+
+        fila_tot_cat = pd.DataFrame([{
+            "Etiquetas de fila": "Total general",
+            "Suma de Valor": tot_val,
+            "Gasto / Día": tot_gasto_dia
+        }])
+        tabla_cat_final = pd.concat([tabla_cat[["Etiquetas de fila", "Suma de Valor", "Gasto / Día"]], fila_tot_cat], ignore_index=True)
         st.markdown(render_excel_table(tabla_cat_final), unsafe_allow_html=True)
 
 
 # =========================================================
-# SECCIÓN 2: GRÁFICOS OPTIMIZADOS (OPCIÓN 1 FIJA)
+# SECCIÓN 2: GRÁFICOS OPTIMIZADOS
 # =========================================================
 st.markdown("---")
 st.markdown("<h3 style='color: #FFFFFF !important;'>📊 Gráficos Dinámicos</h3>", unsafe_allow_html=True)
