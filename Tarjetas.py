@@ -41,7 +41,7 @@ components.html(
 )
 
 # ---------------------------------------------------------
-# ESTILOS CSS PERSONALIZADOS (OPCIÓN 1: POPOVER + FUENTE GRANDE)
+# ESTILOS CSS PERSONALIZADOS (TABS SIEMPRE VISIBLES Y DESTACADOS)
 # ---------------------------------------------------------
 st.markdown(
     """
@@ -53,7 +53,54 @@ st.markdown(
         [data-testid="stHeader"] { background-color: rgba(0, 0, 0, 0) !important; }
         .block-container { padding: 1.2rem 0.8rem 2rem 0.8rem; max-width: 740px; }
 
-        /* 🎨 BOTÓN PRINCIPAL DEL FILTRO (SIEMPRE OSCURO) 🎨 */
+        /* -------------------------------------------------
+           ✨ CORRECCIÓN TOTAL DE PESTAÑAS (TABS) INACTIVAS Y ACTIVAS ✨
+           ------------------------------------------------- */
+        div[data-testid="stTabs"] [data-baseweb="tab-list"] {
+            background-color: transparent !important;
+            gap: 6px !important;
+        }
+
+        /* TODAS LAS PESTAÑAS INACTIVAS: Fondo oscuro + Texto Blanco Puro 100% visible */
+        div[data-testid="stTabs"] button[role="tab"],
+        div[data-testid="stTabs"] button[data-baseweb="tab"] {
+            background-color: #1E222B !important;
+            border-radius: 8px 8px 0px 0px !important;
+            padding: 8px 14px !important;
+            opacity: 1 !important;
+            border-bottom: 2px solid #2D323E !important;
+            margin-right: 2px !important;
+        }
+
+        div[data-testid="stTabs"] button[role="tab"] *,
+        div[data-testid="stTabs"] button[role="tab"] p,
+        div[data-testid="stTabs"] button[role="tab"] span,
+        div[data-testid="stTabs"] button[role="tab"] div {
+            color: #FFFFFF !important;
+            -webkit-text-fill-color: #FFFFFF !important;
+            font-size: 0.98rem !important;
+            font-weight: 700 !important;
+            opacity: 1 !important;
+            visibility: visible !important;
+        }
+
+        /* PESTAÑA ACTIVA SELECCIONADA: Resalta en Turquesa Neón con borde brillante */
+        div[data-testid="stTabs"] button[role="tab"][aria-selected="true"],
+        div[data-testid="stTabs"] button[data-baseweb="tab"][aria-selected="true"] {
+            background-color: #14171E !important;
+            border-bottom: 3.5px solid #00D1B2 !important;
+        }
+
+        div[data-testid="stTabs"] button[role="tab"][aria-selected="true"] *,
+        div[data-testid="stTabs"] button[role="tab"][aria-selected="true"] p,
+        div[data-testid="stTabs"] button[role="tab"][aria-selected="true"] span,
+        div[data-testid="stTabs"] button[role="tab"][aria-selected="true"] div {
+            color: #00D1B2 !important;
+            -webkit-text-fill-color: #00D1B2 !important;
+            font-weight: 800 !important;
+        }
+
+        /* 🎨 BOTÓN PRINCIPAL DEL FILTRO (POPOVER) 🎨 */
         div[data-testid="stPopover"], 
         div[data-testid="stPopover"] > button,
         button[data-testid="stPopoverButton"] {
@@ -96,7 +143,6 @@ st.markdown(
             -webkit-text-fill-color: #FAFAFA !important;
         }
 
-        /* Área táctil ampliada y ajuste multilínea para nombres largos */
         div[data-testid="stPopoverBody"] div[data-testid="stRadio"] label {
             padding: 10px 6px !important;
             margin-bottom: 6px !important;
@@ -130,27 +176,6 @@ st.markdown(
         [data-testid="stMarkdownContainer"] h6 {
             color: #FFFFFF !important;
             -webkit-text-fill-color: #FFFFFF !important;
-        }
-
-        div[data-testid="stTabs"] button[role="tab"] {
-            background-color: transparent !important;
-            border-bottom-color: #2D323E !important;
-            opacity: 1 !important;
-        }
-        div[data-testid="stTabs"] button[role="tab"] div[data-testid="stMarkdownContainer"] p {
-            color: #FFFFFF !important;
-            -webkit-text-fill-color: #FFFFFF !important;
-            font-size: 1.05rem !important;
-            font-weight: 800 !important;
-            opacity: 1 !important;
-            visibility: visible !important;
-        }
-        div[data-testid="stTabs"] button[role="tab"][aria-selected="true"] div[data-testid="stMarkdownContainer"] p {
-            color: #00D1B2 !important;
-            -webkit-text-fill-color: #00D1B2 !important;
-        }
-        div[data-testid="stTabs"] button[role="tab"][aria-selected="true"] {
-            border-bottom-color: #00D1B2 !important;
         }
 
         div[data-testid="stRadio"] *, div[data-testid="stSelectbox"] label * {
@@ -410,7 +435,6 @@ with tab_grafico_evolucion_anual:
         if "est_seleccionado" not in st.session_state:
             st.session_state.est_seleccionado = "Todos"
             
-        # 📌 OPCIÓN 1: FILTRO CON CAJA Y VIÑETAS (POPOVER) 📌
         with st.popover(f"📍 Filtro: {st.session_state.est_seleccionado}"):
             est_seleccionado = st.radio("Selecciona Establecimiento:", options=establecimientos, index=establecimientos.index(st.session_state.est_seleccionado), key="radio_est")
             if est_seleccionado != st.session_state.est_seleccionado:
