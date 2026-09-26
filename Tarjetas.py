@@ -8,6 +8,7 @@ import requests
 import pandas as pd
 import plotly.express as px
 import streamlit as st
+import streamlit.components.v1 as components
 
 # ---------------------------------------------------------
 # CONFIGURACIÓN DE PÁGINA
@@ -20,7 +21,37 @@ st.set_page_config(
 )
 
 # ---------------------------------------------------------
-# ESTILOS CSS PERSONALIZADOS (MODO OSCURO Y BLOQUEO DE TECLADO)
+# SCRIPT INVISIBLE: BLOQUEO DEFINITIVO DEL TECLADO EN MÓVILES
+# ---------------------------------------------------------
+# Esto inyecta JavaScript para poner 'inputmode=none' y 'readonly' 
+# a los filtros de Streamlit, evitando que Android/iOS abran el teclado.
+components.html(
+    """
+    <script>
+    const doc = window.parent.document;
+    function blockVirtualKeyboard() {
+        // Seleccionar todos los campos de texto dentro de los selectbox
+        const inputs = doc.querySelectorAll('div[data-baseweb="select"] input');
+        inputs.forEach(input => {
+            input.setAttribute('inputmode', 'none'); // Apaga el teclado en móviles
+            input.setAttribute('readonly', 'true');  // Evita que se active el cursor
+            input.style.caretColor = 'transparent';  // Oculta la rayita de escritura
+        });
+    }
+    
+    // Ejecutar al cargar
+    blockVirtualKeyboard();
+    
+    // Mantener un monitor constante por si Streamlit redibuja la pantalla
+    setInterval(blockVirtualKeyboard, 400);
+    </script>
+    """,
+    height=0,
+    width=0,
+)
+
+# ---------------------------------------------------------
+# ESTILOS CSS PERSONALIZADOS (MODO OSCURO)
 # ---------------------------------------------------------
 st.markdown(
     """
@@ -31,17 +62,6 @@ st.markdown(
         }
         [data-testid="stHeader"] { background-color: rgba(0, 0, 0, 0) !important; }
         .block-container { padding: 1.2rem 0.8rem 2rem 0.8rem; max-width: 740px; }
-
-        /* 🚫 BLOQUEO DEFINITIVO DEL TECLADO EN MÓVILES 🚫 */
-        /* Bloquea la entrada de texto en los filtros (selectbox) para que solo funcionen como listas desplegables */
-        div[data-baseweb="select"] input {
-            pointer-events: none !important;
-            caret-color: transparent !important;
-        }
-        /* Asegura que los botones de radio sí funcionen */
-        div[data-testid="stRadio"] input {
-             pointer-events: auto !important;
-        }
 
         /* Bloquea la captura táctil de Plotly para permitir scroll de página fluido */
         .js-plotly-plot, .plotly, .plot-container, .main-svg {
@@ -299,7 +319,6 @@ with tab_anio:
 with tab_cat_anio:
     if not df_filtrado.empty:
         tabla_dinamica = df_filtrado.groupby(["Establecimiento", "Año"], as_index=False)["Valor"].sum().rename(columns={"Establecimiento": "Categoría", "Valor": "Suma de Valor"}).sort_values(by=["Categoría", "Año"])
-        # Conversión a texto para evitar comas de miles en los años
         tabla_dinamica["Año"] = tabla_dinamica["Año"].astype(str) 
         st.markdown(render_excel_table(tabla_dinamica), unsafe_allow_html=True)
 
@@ -325,18 +344,16 @@ with tab_categoria:
 st.markdown("---")
 st.markdown("<h3 style='color: #FFFFFF !important;'>📊 Gráficos Dinámicos</h3>", unsafe_allow_html=True)
 
-# Configuración estricta de Plotly para evitar comportamiento táctil agresivo
 plotly_config = {
     'displayModeBar': False,
     'scrollZoom': False,
     'doubleClick': False,
     'showAxisDragHandles': False,
     'showAxisRangeEntryBoxes': False,
-    'staticPlot': True # Convierte el gráfico en imagen estática para cero conflictos táctiles.
+    'staticPlot': True
 }
 
 def wrap_labels(text, width=18):
-    """Divide textos largos en múltiples líneas."""
     return '<br>'.join(textwrap.wrap(str(text), width=width))
 
 tab_grafico_evolucion_anual, tab_grafico_flujo, tab_grafico_top = st.tabs([
@@ -367,21 +384,17 @@ with tab_grafico_evolucion_anual:
 
             fig_evo_anual = px.bar(df_evo_anual, x="Valor", y="Año", orientation="h", template="plotly_dark", text="Valor")
             
-            # CORRECCIÓN: Textposition="outside" y cliponaxis=False para evitar superposiciones
             fig_evo_anual.update_traces(
                 marker_color="#38BDF8", texttemplate="$%{x:,.2f}", textposition="outside", 
                 cliponaxis=False, textfont=dict(color="#FFFFFF", size=11, family="sans-serif")
             )
-            # Bloqueo estricto de zoom y movimiento de ejes
             fig_evo_anual.update_xaxes(fixedrange=True)
             fig_evo_anual.update_yaxes(fixedrange=True)
             fig_evo_anual.update_layout(
                 dragmode=False,
                 paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-                # Aumento del rango a 1.35 para que entre el texto externo
                 xaxis=dict(title="", showticklabels=False, range=[0, max_evo * 1.35]),
                 yaxis=dict(title="", type='category', tickfont=dict(color="#FFFFFF", size=12)), 
-                # Margen derecho ampliado (r=40) para acomodar los números a la derecha
                 margin=dict(l=45, r=40, t=10, b=10),
                 height=250,
             )
@@ -411,7 +424,6 @@ with tab_grafico_flujo:
                 marker_color="#00D1B2", texttemplate="$%{x:,.2f}", textposition="outside", 
                 cliponaxis=False, textfont=dict(color="#FFFFFF", size=11)
             )
-            # Bloqueo estricto de zoom y movimiento de ejes
             fig_flujo.update_xaxes(fixedrange=True)
             fig_flujo.update_yaxes(fixedrange=True)
             fig_flujo.update_layout(
@@ -440,7 +452,6 @@ with tab_grafico_top:
             marker_color="#FBBF24", texttemplate="$%{x:,.2f}", textposition="outside", 
             cliponaxis=False, textfont=dict(color="#FFFFFF", size=11)
         )
-        # Bloqueo estricto de zoom y movimiento de ejes
         fig_top.update_xaxes(fixedrange=True)
         fig_top.update_yaxes(fixedrange=True)
         fig_top.update_layout(
