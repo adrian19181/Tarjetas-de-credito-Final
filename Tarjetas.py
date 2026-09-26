@@ -20,7 +20,7 @@ st.set_page_config(
 )
 
 # ---------------------------------------------------------
-# ESTILOS CSS PERSONALIZADOS (MODO OSCURO Y BLOQUEO DE TECLADO)
+# ESTILOS CSS PERSONALIZADOS (MODO OSCURO Y FIX POPOVER)
 # ---------------------------------------------------------
 st.markdown(
     """
@@ -32,7 +32,7 @@ st.markdown(
         [data-testid="stHeader"] { background-color: rgba(0, 0, 0, 0) !important; }
         .block-container { padding: 1.2rem 0.8rem 2rem 0.8rem; max-width: 740px; }
 
-        /* 🚫 BLOQUEO DEFINITIVO DEL TECLADO EN MÓVILES 🚫 */
+        /* 🚫 BLOQUEO DE TECLADO EN SELECTBOXES 🚫 */
         div[data-baseweb="select"] input {
             pointer-events: none !important;
             user-select: none !important;
@@ -42,6 +42,18 @@ st.markdown(
         
         div[data-testid="stRadio"] input {
              pointer-events: auto !important;
+        }
+
+        /* 🎨 FIX PARA LA VENTANA FLOTANTE DEL POPOVER (MODO OSCURO) 🎨 */
+        div[data-baseweb="popover"], div[data-testid="stPopoverBody"] {
+            background-color: #1E222B !important;
+            border: 1.5px solid #00D1B2 !important;
+            border-radius: 12px !important;
+            padding: 10px !important;
+        }
+        div[data-baseweb="popover"] *, div[data-testid="stPopoverBody"] * {
+            color: #FAFAFA !important;
+            -webkit-text-fill-color: #FAFAFA !important;
         }
 
         /* Bloquea la captura táctil de Plotly para permitir scroll de página fluido */
@@ -348,12 +360,10 @@ with tab_grafico_evolucion_anual:
     if not df_filtrado.empty:
         establecimientos = ["Todos"] + sorted(list(df_filtrado["Establecimiento"].dropna().unique()))
         
-        # OPCIÓN 1: POPOVER + RADIO BUTTONS (CERO TECLADO EN MÓVILES)
         if "est_seleccionado" not in st.session_state:
             st.session_state.est_seleccionado = "Todos"
             
         with st.popover(f"📍 Filtro: {st.session_state.est_seleccionado}"):
-            # st.radio es puramente táctil, jamás levanta teclado
             est_seleccionado = st.radio("Selecciona Establecimiento:", options=establecimientos, index=establecimientos.index(st.session_state.est_seleccionado), key="radio_est")
             if est_seleccionado != st.session_state.est_seleccionado:
                 st.session_state.est_seleccionado = est_seleccionado
