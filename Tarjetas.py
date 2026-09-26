@@ -13,14 +13,14 @@ import streamlit as st
 # CONFIGURACIÓN DE PÁGINA
 # ---------------------------------------------------------
 st.set_page_config(
-    page_title="Tarjetas de Credito",
+    page_title="Mis Consumos",
     page_icon="💳",
     layout="centered",
     initial_sidebar_state="collapsed",
 )
 
 # ---------------------------------------------------------
-# ESTILOS CSS PERSONALIZADOS (MODO OSCURO Y ESTILO EXCEL)
+# ESTILOS CSS PERSONALIZADOS (MODO OSCURO, OPTIMIZADO TÁCTIL)
 # ---------------------------------------------------------
 st.markdown(
     """
@@ -31,6 +31,25 @@ st.markdown(
         }
         [data-testid="stHeader"] { background-color: rgba(0, 0, 0, 0) !important; }
         .block-container { padding: 1.2rem 0.8rem 2rem 0.8rem; max-width: 740px; }
+
+        /* Evitar zoom automático e invocación accidental del teclado en móviles */
+        input, select, textarea, [data-baseweb="select"] {
+            font-size: 16px !important;
+            pointer-events: none !important; /* Desactiva interacción que llame al teclado */
+        }
+        
+        /* Habilitar interacción solo para los selectbox y radio buttons explícitamente */
+        div[data-testid="stSelectbox"] select, div[data-testid="stRadio"] input {
+             pointer-events: auto !important;
+        }
+
+        /* Bloquea la captura táctil de Plotly para permitir scroll de página fluido */
+        .js-plotly-plot, .plotly, .plot-container, .main-svg {
+            touch-action: pan-y !important;
+            user-select: none !important;
+            -webkit-user-select: none !important;
+            -webkit-touch-callout: none !important;
+        }
 
         h1, h2, h3, h4, h5, h6, 
         [data-testid="stMarkdownContainer"] h1, 
@@ -299,15 +318,23 @@ with tab_categoria:
 
 
 # =========================================================
-# SECCIÓN 2: GRÁFICOS OPTIMIZADOS PARA MÓVIL
+# SECCIÓN 2: GRÁFICOS OPTIMIZADOS (ZOOM Y TECLADO BLOQUEADOS)
 # =========================================================
 st.markdown("---")
 st.markdown("<h3 style='color: #FFFFFF !important;'>📊 Gráficos Dinámicos</h3>", unsafe_allow_html=True)
 
-plotly_config = {'displayModeBar': False}
+# Configuración estricta de Plotly para evitar comportamiento táctil agresivo
+plotly_config = {
+    'displayModeBar': False,
+    'scrollZoom': False,
+    'doubleClick': False,
+    'showAxisDragHandles': False,
+    'showAxisRangeEntryBoxes': False,
+    'staticPlot': True # Esto convierte el gráfico en una imagen estática, bloqueando toda interacción.
+}
 
 def wrap_labels(text, width=18):
-    """Divide textos largos en múltiples líneas para no ocupar ancho en gráficos."""
+    """Divide textos largos en múltiples líneas."""
     return '<br>'.join(textwrap.wrap(str(text), width=width))
 
 tab_grafico_evolucion_anual, tab_grafico_flujo, tab_grafico_top = st.tabs([
@@ -341,7 +368,11 @@ with tab_grafico_evolucion_anual:
                 marker_color="#38BDF8", texttemplate="$%{x:,.2f}", textposition="inside", 
                 textfont=dict(color="#FFFFFF", size=13, family="sans-serif")
             )
+            # Bloqueo estricto de zoom y movimiento de ejes
+            fig_evo_anual.update_xaxes(fixedrange=True)
+            fig_evo_anual.update_yaxes(fixedrange=True)
             fig_evo_anual.update_layout(
+                dragmode=False,
                 paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
                 xaxis=dict(title="", showticklabels=False, range=[0, max_evo * 1.05]),
                 yaxis=dict(title="", type='category', tickfont=dict(color="#FFFFFF", size=12)), 
@@ -374,7 +405,11 @@ with tab_grafico_flujo:
                 marker_color="#00D1B2", texttemplate="$%{x:,.2f}", textposition="outside", 
                 cliponaxis=False, textfont=dict(color="#FFFFFF", size=11)
             )
+            # Bloqueo estricto de zoom y movimiento de ejes
+            fig_flujo.update_xaxes(fixedrange=True)
+            fig_flujo.update_yaxes(fixedrange=True)
             fig_flujo.update_layout(
+                dragmode=False,
                 paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
                 xaxis=dict(title="", showticklabels=False, range=[0, max_flujo * 1.35]),
                 yaxis=dict(title="", tickfont=dict(color="#FFFFFF", size=10)),
@@ -399,7 +434,11 @@ with tab_grafico_top:
             marker_color="#FBBF24", texttemplate="$%{x:,.2f}", textposition="outside", 
             cliponaxis=False, textfont=dict(color="#FFFFFF", size=11)
         )
+        # Bloqueo estricto de zoom y movimiento de ejes
+        fig_top.update_xaxes(fixedrange=True)
+        fig_top.update_yaxes(fixedrange=True)
         fig_top.update_layout(
+            dragmode=False,
             paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
             yaxis=dict(categoryorder="total ascending", title="", tickfont=dict(color="#FFFFFF", size=10)),
             xaxis=dict(range=[0, max_valor * 1.35], showticklabels=False, title=""),
@@ -409,26 +448,28 @@ with tab_grafico_top:
         st.plotly_chart(fig_top, use_container_width=True, theme=None, config=plotly_config)
 
 # =========================================================
-# AUTO-EJECUCIÓN LOCAL / NUBE
+# AUTO-EJECUCIÓN AL HACER DOBLE CLIC EN EL ARCHIVO .PY
 # =========================================================
-if __name__ == "__main__" and not st.runtime.exists():
-    os.environ["STREAMLIT_RUNNING"] = "true"
-    
-    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    try:
-        s.connect(('10.255.255.255', 1))
-        IP = s.getsockname()[0]
-    except Exception:
-        IP = '127.0.0.1'
-    finally:
-        s.close()
+if __name__ == "__main__":
+    if not os.environ.get("STREAMLIT_RUNNING"):
+        os.environ["STREAMLIT_RUNNING"] = "true"
         
-    os.system('cls' if os.name == 'nt' else 'clear')
-    print("="*60)
-    print("  DASHBOARD INICIADO CORRECTAMENTE")
-    print("="*60)
-    print("\n  PARA VER EL DASHBOARD EN TU CELULAR, ABRE CHROME Y ESCRIBE ESTA DIRECCION:\n")
-    print(f"  👉  http://{IP}:8501  👈\n")
-    print("="*60)
-    
-    subprocess.run([sys.executable, "-m", "streamlit", "run", sys.argv[0], "--server.address=0.0.0.0"])
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        try:
+            s.connect(('10.255.255.255', 1))
+            IP = s.getsockname()[0]
+        except Exception:
+            IP = '127.0.0.1'
+        finally:
+            s.close()
+            
+        os.system('cls' if os.name == 'nt' else 'clear')
+        print("="*60)
+        print("  DASHBOARD INICIADO CORRECTAMENTE")
+        print("="*60)
+        print("\n  PARA VER EL DASHBOARD EN TU CELULAR, ABRE CHROME Y ESCRIBE ESTA DIRECCION:\n")
+        print(f"  👉  http://{IP}:8501  👈\n")
+        print("="*60)
+        print("  (Deja esta ventana negra abierta mientras usas el celular)")
+        
+        subprocess.run([sys.executable, "-m", "streamlit", "run", sys.argv[0], "--server.address=0.0.0.0"])
