@@ -33,8 +33,6 @@ st.markdown(
         .block-container { padding: 1.2rem 0.8rem 2rem 0.8rem; max-width: 740px; }
 
         /* 🚫 BLOQUEO DEFINITIVO DEL TECLADO EN MÓVILES 🚫 */
-        /* Al apuntar directamente al tag 'input' dentro del selectbox, bloqueamos el foco que llama al teclado,
-           pero mantenemos vivo el contenedor para que la lista despliegue al tocar la caja o la flecha. */
         div[data-baseweb="select"] input {
             pointer-events: none !important;
             user-select: none !important;
@@ -42,7 +40,6 @@ st.markdown(
             -moz-user-select: none !important;
         }
         
-        /* Aseguramos que los radio buttons sigan funcionando normal */
         div[data-testid="stRadio"] input {
              pointer-events: auto !important;
         }
@@ -100,23 +97,24 @@ st.markdown(
             opacity: 1 !important;
         }
 
-        div[data-testid="stButton"] > button, div[data-testid="stDownloadButton"] > button {
+        div[data-testid="stButton"] > button, div[data-testid="stDownloadButton"] > button, div[data-testid="stPopover"] > button {
             background-color: #1E222B !important;
             border: 1.5px solid #107C41 !important;
             border-radius: 8px !important;
             padding: 0.4rem 0.8rem !important;
             margin-top: 6px;
+            width: 100% !important; 
         }
-        div[data-testid="stButton"] > button *, div[data-testid="stDownloadButton"] > button * {
+        div[data-testid="stButton"] > button *, div[data-testid="stDownloadButton"] > button *, div[data-testid="stPopover"] > button * {
             color: #FFFFFF !important;
             -webkit-text-fill-color: #FFFFFF !important;
             font-weight: 700 !important;
         }
-        div[data-testid="stButton"] > button:hover, div[data-testid="stDownloadButton"] > button:hover {
+        div[data-testid="stButton"] > button:hover, div[data-testid="stDownloadButton"] > button:hover, div[data-testid="stPopover"] > button:hover {
             background-color: #107C41 !important;
             border-color: #107C41 !important;
         }
-        div[data-testid="stButton"] > button:hover *, div[data-testid="stDownloadButton"] > button:hover * {
+        div[data-testid="stButton"] > button:hover *, div[data-testid="stDownloadButton"] > button:hover *, div[data-testid="stPopover"] > button:hover * {
             color: #FFFFFF !important;
             -webkit-text-fill-color: #FFFFFF !important;
         }
@@ -349,14 +347,21 @@ tab_grafico_evolucion_anual, tab_grafico_flujo, tab_grafico_top = st.tabs([
 with tab_grafico_evolucion_anual:
     if not df_filtrado.empty:
         establecimientos = ["Todos"] + sorted(list(df_filtrado["Establecimiento"].dropna().unique()))
-        est_seleccionado = st.selectbox(
-            "Filtro de Establecimiento (Segmentador):", 
-            options=establecimientos, index=0, key="filtro_est_anual"
-        )
+        
+        # OPCIÓN 1: POPOVER + RADIO BUTTONS (CERO TECLADO EN MÓVILES)
+        if "est_seleccionado" not in st.session_state:
+            st.session_state.est_seleccionado = "Todos"
+            
+        with st.popover(f"📍 Filtro: {st.session_state.est_seleccionado}"):
+            # st.radio es puramente táctil, jamás levanta teclado
+            est_seleccionado = st.radio("Selecciona Establecimiento:", options=establecimientos, index=establecimientos.index(st.session_state.est_seleccionado), key="radio_est")
+            if est_seleccionado != st.session_state.est_seleccionado:
+                st.session_state.est_seleccionado = est_seleccionado
+                st.rerun()
         
         df_chart_evo = df_filtrado.copy()
-        if est_seleccionado != "Todos":
-            df_chart_evo = df_chart_evo[df_chart_evo["Establecimiento"] == est_seleccionado]
+        if st.session_state.est_seleccionado != "Todos":
+            df_chart_evo = df_chart_evo[df_chart_evo["Establecimiento"] == st.session_state.est_seleccionado]
 
         if not df_chart_evo.empty:
             df_evo_anual = df_chart_evo.groupby("Año")["Valor"].sum().reset_index()
@@ -364,7 +369,7 @@ with tab_grafico_evolucion_anual:
             df_evo_anual["Año"] = df_evo_anual["Año"].astype(str)
             max_evo = df_evo_anual["Valor"].max() if not df_evo_anual.empty else 100
             
-            st.markdown(f"<h5 style='color: #38BDF8; text-align: center;'>Evolución del Gasto: {est_seleccionado}</h5>", unsafe_allow_html=True)
+            st.markdown(f"<h5 style='color: #38BDF8; text-align: center;'>Evolución del Gasto: {st.session_state.est_seleccionado}</h5>", unsafe_allow_html=True)
 
             fig_evo_anual = px.bar(df_evo_anual, x="Valor", y="Año", orientation="h", template="plotly_dark", text="Valor")
             
@@ -384,7 +389,7 @@ with tab_grafico_evolucion_anual:
             )
             st.plotly_chart(fig_evo_anual, use_container_width=True, theme=None, config=plotly_config)
         else:
-            st.info(f"No hay registros para '{est_seleccionado}'.")
+            st.info(f"No hay registros para '{st.session_state.est_seleccionado}'.")
 
 with tab_grafico_flujo:
     if not df_filtrado.empty:
