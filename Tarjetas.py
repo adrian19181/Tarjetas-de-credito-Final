@@ -705,7 +705,7 @@ def wrap_labels(text, width=18):
 ])
 
 # ---------------------------------------------------------
-# GRÁFICO 1: LIQUIDEZ A CUBRIR POR TARJETA (CON MORADO SUAVE Y RENOMBRADO)
+# GRÁFICO 1: LIQUIDEZ A CUBRIR POR TARJETA (MAPA FIJO DE COLORES)
 # ---------------------------------------------------------
 with tab_grafico_pie:
   if not df_filtrado.empty:
@@ -736,15 +736,13 @@ with tab_grafico_pie:
           unsafe_allow_html=True,
       )
 
-      # Paleta elegante con morado suave en lugar de tonos rosados
-      soft_purple_colors = [
-          "#9B51E0",
-          "#10B981",
-          "#2F80ED",
-          "#F2C94C",
-          "#A855F7",
-          "#38BDF8",
-      ]
+      # Mapa de colores explícito: Mastercard recibe morado suave profundo (#7C3AED)
+      card_colors = {
+          "Mastercard": "#7C3AED",
+          "Visa": "#10B981",
+          "PRODUBANCO MC": "#2563EB",
+          "AMEX": "#F59E0B",
+      }
 
       fig_pie = px.pie(
           df_pie,
@@ -752,7 +750,8 @@ with tab_grafico_pie:
           names="Tarjeta",
           hole=0.45,
           template="plotly_dark",
-          color_discrete_sequence=soft_purple_colors,
+          color="Tarjeta",
+          color_discrete_map=card_colors,
       )
       fig_pie.update_traces(
           textposition="inside",
