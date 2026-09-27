@@ -705,7 +705,7 @@ def wrap_labels(text, width=18):
 ])
 
 # ---------------------------------------------------------
-# GRÁFICO 1: LIQUIDEZ A CUBRIR POR TARJETA (MAPA FIJO DE COLORES)
+# GRÁFICO 1: LIQUIDEZ A CUBRIR POR TARJETA (AMEX EN MORADO SUAVE)
 # ---------------------------------------------------------
 with tab_grafico_pie:
   if not df_filtrado.empty:
@@ -736,12 +736,12 @@ with tab_grafico_pie:
           unsafe_allow_html=True,
       )
 
-      # Mapa de colores explícito: Mastercard recibe morado suave profundo (#7C3AED)
+      # Mapa de colores explícito: AMEX recibe el morado suave (#A855F7) para alto contraste con texto blanco
       card_colors = {
-          "Mastercard": "#7C3AED",
-          "Visa": "#10B981",
-          "PRODUBANCO MC": "#2563EB",
-          "AMEX": "#F59E0B",
+          "AMEX": "#A855F7",           # Morado suave destacado
+          "Mastercard": "#6366F1",     # Índigo / Violeta profundo
+          "Visa": "#10B981",           # Verde esmeralda
+          "PRODUBANCO MC": "#2563EB",  # Azul eléctrico
       }
 
       fig_pie = px.pie(
