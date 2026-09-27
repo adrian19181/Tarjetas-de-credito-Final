@@ -202,7 +202,6 @@ st.markdown(
         
         .card-name-title { font-size: 1.25rem !important; font-weight: 800 !important; margin: 0; color: #FFFFFF !important; }
         
-        /* TAMAÑO DE FUENTE MÁS GRANDE PARA EL NÚMERO DE DÍAS EN KPI */
         .card-time-badge { 
             font-size: 1.1rem !important; 
             color: #E2E8F0 !important; 
@@ -263,7 +262,6 @@ def load_credit_card_data():
 
   df["Valor"] = pd.to_numeric(df["Valor"], errors="coerce").fillna(0.0)
 
-  # Forzar el parseo de fechas respetando la estructura del Excel (Día/Mes/Año)
   df["Fecha"] = pd.to_datetime(df["Fecha"], dayfirst=True, errors="coerce")
   df = df.dropna(subset=["Fecha"]).copy()
   df["Año"] = df["Fecha"].dt.year.astype(int)
@@ -302,7 +300,6 @@ def calculate_days_for_period(df_subset, year=None, entity_first_date=None):
     days = (end_date - start_date).days + 1
     return max(days, 1)
   else:
-    # Cálculo idéntico a Excel: (Fecha Última Compra - Fecha Primera Compra + 1)
     if entity_first_date is not None and pd.notnull(entity_first_date):
       start_date = pd.Timestamp(entity_first_date).normalize()
     else:
@@ -695,10 +692,87 @@ def wrap_labels(text, width=18):
   return "<br>".join(textwrap.wrap(str(text), width=width))
 
 
-tab_grafico_evolucion_anual, tab_grafico_flujo, tab_grafico_top = st.tabs(
-    ["📅 Evolución Anual", "📊 Flujo por Categoría", "📈 Top 10 Gastos"]
-)
+# Pestañas ordenadas: El gráfico de Liquidez por Tarjeta va PRIMERO
+(
+    tab_grafico_pie,
+    tab_grafico_evolucion_anual,
+    tab_grafico_flujo,
+    tab_grafico_top,
+) = st.tabs([
+    "🍰 Liquidez por Tarjeta",
+    "📅 Evolución Anual",
+    "📊 Flujo por Categoría",
+    "📈 Top 10 Gastos",
+])
 
+# ---------------------------------------------------------
+# GRÁFICO 1 (NUEVO & PRINCIPAL): LIQUIDEZ A CUBRIR POR TARJETA (PASTEL / DONA)
+# ---------------------------------------------------------
+with tab_grafico_pie:
+  if not df_filtrado.empty:
+    anios_pie = ["Todos"] + sorted(
+        list(df_filtrado["Año"].unique()), reverse=True
+    )
+    anio_pie_sel = st.radio(
+        "Filtro de Año:", options=anios_pie, horizontal=True, key="radio_pie_anio"
+    )
+
+    df_chart_pie = df_filtrado.copy()
+    if anio_pie_sel != "Todos":
+      df_chart_pie = df_chart_pie[df_chart_pie["Año"] == anio_pie_sel]
+
+    if not df_chart_pie.empty:
+      df_pie = df_chart_pie.groupby("Tarjeta")["Valor"].sum().reset_index()
+
+      st.markdown(
+          "<h5 style='color: #00D1B2; text-align: center; margin-top:"
+          " 10px;'>LIQUIDEZ A CUBRIR POR TARJETA</h5>",
+          unsafe_allow_html=True,
+      )
+
+      fig_pie = px.pie(
+          df_pie,
+          values="Valor",
+          names="Tarjeta",
+          hole=0.45,
+          template="plotly_dark",
+          color_discrete_sequence=px.colors.qualitative.Bold,
+      )
+      fig_pie.update_traces(
+          textposition="inside",
+          textinfo="percent+label",
+          hovertemplate=(
+              "<b>%{label}</b><br>Valor: $%{value:,.2f}<br>Porcentaje:"
+              " %{percent}"
+          ),
+          marker=dict(line=dict(color="#0E1117", width=2)),
+          textfont=dict(color="#FFFFFF", size=11, family="sans-serif"),
+      )
+      fig_pie.update_layout(
+          dragmode=False,
+          paper_bgcolor="rgba(0,0,0,0)",
+          plot_bgcolor="rgba(0,0,0,0)",
+          margin=dict(l=10, r=10, t=20, b=20),
+          height=360,
+          showlegend=True,
+          legend=dict(
+              orientation="h",
+              yanchor="bottom",
+              y=-0.2,
+              xanchor="center",
+              x=0.5,
+              font=dict(color="#FFFFFF", size=10),
+          ),
+      )
+      st.plotly_chart(
+          fig_pie, use_container_width=True, theme=None, config=plotly_config
+      )
+    else:
+      st.info(f"No hay registros para el año {anio_pie_sel}.")
+
+# ---------------------------------------------------------
+# GRÁFICO 2: EVOLUCIÓN ANUAL
+# ---------------------------------------------------------
 with tab_grafico_evolucion_anual:
   if not df_filtrado.empty:
     establecimientos = ["Todos"] + sorted(
@@ -783,6 +857,9 @@ with tab_grafico_evolucion_anual:
           f"No hay registros para '{st.session_state.est_seleccionado}'."
       )
 
+# ---------------------------------------------------------
+# GRÁFICO 3: FLUJO POR CATEGORÍA
+# ---------------------------------------------------------
 with tab_grafico_flujo:
   if not df_filtrado.empty:
     anios_grafico = ["Todos"] + sorted(
@@ -851,6 +928,9 @@ with tab_grafico_flujo:
     else:
       st.info(f"No hay registros para el año {anio_seleccionado}.")
 
+# ---------------------------------------------------------
+# GRÁFICO 4: TOP 10 GASTOS
+# ---------------------------------------------------------
 with tab_grafico_top:
   if not df_filtrado.empty:
     top_est = (
