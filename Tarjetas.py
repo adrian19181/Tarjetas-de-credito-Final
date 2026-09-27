@@ -692,7 +692,6 @@ def wrap_labels(text, width=18):
   return "<br>".join(textwrap.wrap(str(text), width=width))
 
 
-# Pestañas ordenadas: El gráfico de Liquidez por Tarjeta va PRIMERO
 (
     tab_grafico_pie,
     tab_grafico_evolucion_anual,
@@ -706,7 +705,7 @@ def wrap_labels(text, width=18):
 ])
 
 # ---------------------------------------------------------
-# GRÁFICO 1 (NUEVO & PRINCIPAL): LIQUIDEZ A CUBRIR POR TARJETA (PASTEL / DONA)
+# GRÁFICO 1: LIQUIDEZ A CUBRIR POR TARJETA (CON MORADO SUAVE Y RENOMBRADO)
 # ---------------------------------------------------------
 with tab_grafico_pie:
   if not df_filtrado.empty:
@@ -724,11 +723,28 @@ with tab_grafico_pie:
     if not df_chart_pie.empty:
       df_pie = df_chart_pie.groupby("Tarjeta")["Valor"].sum().reset_index()
 
+      # Renombrar MasterCard Produbanco a PRODUBANCO MC solo para este gráfico
+      df_pie["Tarjeta"] = df_pie["Tarjeta"].replace({
+          "MasterCard Produbanco": "PRODUBANCO MC",
+          "Mastercard Produbanco": "PRODUBANCO MC",
+          "MASTERCARD PRODUBANCO": "PRODUBANCO MC",
+      })
+
       st.markdown(
           "<h5 style='color: #00D1B2; text-align: center; margin-top:"
           " 10px;'>LIQUIDEZ A CUBRIR POR TARJETA</h5>",
           unsafe_allow_html=True,
       )
+
+      # Paleta elegante con morado suave en lugar de tonos rosados
+      soft_purple_colors = [
+          "#9B51E0",
+          "#10B981",
+          "#2F80ED",
+          "#F2C94C",
+          "#A855F7",
+          "#38BDF8",
+      ]
 
       fig_pie = px.pie(
           df_pie,
@@ -736,7 +752,7 @@ with tab_grafico_pie:
           names="Tarjeta",
           hole=0.45,
           template="plotly_dark",
-          color_discrete_sequence=px.colors.qualitative.Bold,
+          color_discrete_sequence=soft_purple_colors,
       )
       fig_pie.update_traces(
           textposition="inside",
