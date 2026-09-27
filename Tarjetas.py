@@ -52,18 +52,18 @@ st.markdown(
             color: #FAFAFA !important;
         }
         [data-testid="stHeader"] { background-color: rgba(0, 0, 0, 0) !important; }
-        .block-container { padding: 1.2rem 0.8rem 2rem 0.8rem; max-width: 740px; }
+        .block-container { padding: 1.2rem 0.5rem 2rem 0.5rem; max-width: 740px; }
 
         div[data-testid="stTabs"] [data-baseweb="tab-list"] {
             background-color: transparent !important;
-            gap: 6px !important;
+            gap: 4px !important;
         }
 
         div[data-testid="stTabs"] button[role="tab"],
         div[data-testid="stTabs"] button[data-baseweb="tab"] {
             background-color: #1E222B !important;
             border-radius: 8px 8px 0px 0px !important;
-            padding: 8px 14px !important;
+            padding: 8px 10px !important;
             opacity: 1 !important;
             border-bottom: 2px solid #2D323E !important;
             margin-right: 2px !important;
@@ -75,7 +75,7 @@ st.markdown(
         div[data-testid="stTabs"] button[role="tab"] div {
             color: #FFFFFF !important;
             -webkit-text-fill-color: #FFFFFF !important;
-            font-size: 0.98rem !important;
+            font-size: 0.92rem !important;
             font-weight: 700 !important;
             opacity: 1 !important;
             visibility: visible !important;
@@ -199,11 +199,14 @@ st.markdown(
         .credit-card-box { background-color: #1E222B; border: 1px solid #2D323E; border-radius: 12px; padding: 12px 14px; margin-bottom: 12px;}
         .total-card-box { background: linear-gradient(135deg, #132433 0%, #1E222B 100%); border: 1.8px solid #00D1B2; border-radius: 12px; padding: 14px 16px; margin-top: 6px; margin-bottom: 14px; }
         .card-header-flex { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-        .card-name-title { font-size: 1rem; font-weight: 700; margin: 0; color: #FFFFFF !important; }
-        .card-time-badge { font-size: 0.72rem; color: #A0AEC0; background: #2D323E; padding: 3px 8px; border-radius: 6px; font-weight: 500; }
+        
+        /* TÍTULOS DE KPI CON FUENTE MÁS GRANDE */
+        .card-name-title { font-size: 1.25rem !important; font-weight: 800 !important; margin: 0; color: #FFFFFF !important; }
+        
+        .card-time-badge { font-size: 0.75rem; color: #A0AEC0; background: #2D323E; padding: 3px 8px; border-radius: 6px; font-weight: 600; }
         .card-metrics-grid { display: grid; grid-template-columns: 1.15fr 1fr 0.85fr; gap: 6px; text-align: center; }
         .submetric-box { background-color: #14171E; border: 1px solid #252A36; padding: 8px 4px; border-radius: 8px; }
-        .submetric-lbl { font-size: 0.64rem; text-transform: uppercase; color: #94A3B8; font-weight: 600; margin-bottom: 3px; }
+        .submetric-lbl { font-size: 0.68rem; text-transform: uppercase; color: #94A3B8; font-weight: 700; margin-bottom: 3px; }
         .val-total { font-size: 1.05rem; font-weight: 700; color: #00E676; }
         .val-daily { font-size: 1.05rem; font-weight: 700; color: #38BDF8; }
         .val-payments { font-size: 1.05rem; font-weight: 700; color: #FBBF24; }
@@ -262,14 +265,12 @@ def calculate_days_for_period(df_subset, year=None, entity_first_date=None):
         jan1 = pd.Timestamp(f"{year}-01-01")
         dec31 = pd.Timestamp(f"{year}-12-31")
         
-        # Fecha de inicio: la primera compra registrada si es en el mismo año, o 01 de enero
         if entity_first_date is not None and pd.notnull(entity_first_date):
             start_date = max(jan1, pd.Timestamp(entity_first_date).normalize())
         else:
             min_in_sub = df_subset["Fecha"].min().normalize() if not df_subset.empty else jan1
             start_date = max(jan1, min_in_sub)
             
-        # Fecha fin: si es el año actual, usas la fecha de hoy dinámicamente; si es un año pasado, 31 de dic
         if year == current_year:
             end_date = min(dec31, now)
         elif year < current_year:
@@ -294,19 +295,21 @@ def calculate_days_for_period(df_subset, year=None, entity_first_date=None):
         return max(days, 1)
 
 # ---------------------------------------------------------
-# HELPER: GENERADOR DE TABLAS ESTILO EXCEL
+# HELPER: TABLAS COMPACTAS CON NÚMEROS CENTRADOS
 # ---------------------------------------------------------
 def render_excel_table(df, currency_cols=None):
     if currency_cols is None:
         currency_cols = ["Suma de Valor", "Valor", "Gasto / Día"]
+        
     html = """
-    <div style="overflow-x: auto; border-radius: 10px; border: 1.5px solid #107C41; margin-top: 8px; margin-bottom: 12px; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);">
-    <table style="width:100%; border-collapse: collapse; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 0.93rem; color: #FAFAFA;">
+    <div style="overflow-x: auto; border-radius: 10px; border: 1.5px solid #107C41; margin-top: 6px; margin-bottom: 12px; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);">
+    <table style="width:100%; border-collapse: collapse; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 0.86rem; color: #FAFAFA; table-layout: auto;">
         <thead><tr style="background: linear-gradient(135deg, #107C41 0%, #0D5C30 100%); color: #FFFFFF;">
     """
     for col in df.columns:
-        align = "right" if col in currency_cols or "Suma" in col or "Valor" in col or "Día" in col else "left"
-        html += f'<th style="padding: 11px 14px; border-bottom: 2px solid #1B9E52; text-align: {align}; font-weight: 700;">{col}</th>'
+        # Centrar encabezados de números y años
+        align = "center" if col in currency_cols or "Suma" in col or "Valor" in col or "Día" in col or "Año" in col else "left"
+        html += f'<th style="padding: 8px 6px; border-bottom: 2px solid #1B9E52; text-align: {align}; font-weight: 700; white-space: nowrap;">{col}</th>'
     html += '</tr></thead><tbody>'
 
     total_rows = len(df)
@@ -321,12 +324,30 @@ def render_excel_table(df, currency_cols=None):
         html += f'<tr style="{row_style}">'
         for col in df.columns:
             val = row[col]
-            align = "right" if col in currency_cols or "Suma" in col or "Valor" in col or "Día" in col or isinstance(val, (int, float)) else "left"
+            
+            # Centrar números, montos y años
+            is_numeric_col = col in currency_cols or "Suma" in col or "Valor" in col or "Día" in col or "Año" in col or isinstance(val, (int, float))
+            align = "center" if is_numeric_col else "left"
+            
             if isinstance(val, (int, float)):
                 val_str = f"${val:,.2f}" if col in currency_cols or "Suma" in col or "Valor" in col or "Día" in col else f"{val:,}"
             else:
                 val_str = str(val)
-            html += f'<td style="padding: 9px 14px; border-bottom: 1px solid #2A323D; text-align: {align};">{val_str}</td>'
+                # Formato en doble línea para nombres de categoría largos
+                if "Importacion" in val_str or "Impuestos" in val_str:
+                    val_str = val_str.replace(" (", "<br>(")
+                elif len(val_str) > 22 and "(" in val_str:
+                    val_str = val_str.replace(" (", "<br>(")
+                elif len(val_str) > 24:
+                    val_str = "<br>".join(textwrap.wrap(val_str, width=20))
+
+            style_extra = "line-height: 1.25; padding: 7px 6px; border-bottom: 1px solid #2A323D;"
+            if not is_numeric_col:
+                style_extra += " white-space: normal; word-break: break-word;"
+            else:
+                style_extra += " white-space: nowrap;"
+
+            html += f'<td style="{style_extra} text-align: {align};">{val_str}</td>'
         html += '</tr>'
     html += '</tbody></table></div>'
     return html
