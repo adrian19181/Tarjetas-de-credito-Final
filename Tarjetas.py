@@ -202,7 +202,17 @@ st.markdown(
         
         .card-name-title { font-size: 1.25rem !important; font-weight: 800 !important; margin: 0; color: #FFFFFF !important; }
         
-        .card-time-badge { font-size: 0.75rem; color: #A0AEC0; background: #2D323E; padding: 3px 8px; border-radius: 6px; font-weight: 600; }
+        /* FUENTE MÁS GRANDE PARA EL NÚMERO DE DÍAS */
+        .card-time-badge { 
+            font-size: 1.1rem !important; 
+            color: #E2E8F0 !important; 
+            background: #2A303C !important; 
+            padding: 4px 10px !important; 
+            border-radius: 8px !important; 
+            font-weight: 800 !important;
+            border: 1px solid #3A4252 !important;
+        }
+
         .card-metrics-grid { display: grid; grid-template-columns: 1.15fr 1fr 0.85fr; gap: 6px; text-align: center; }
         .submetric-box { background-color: #14171E; border: 1px solid #252A36; padding: 8px 4px; border-radius: 8px; }
         .submetric-lbl { font-size: 0.68rem; text-transform: uppercase; color: #94A3B8; font-weight: 700; margin-bottom: 3px; }
@@ -253,7 +263,7 @@ except Exception as e:
     st.stop()
 
 # ---------------------------------------------------------
-# FUNCIÓN DINÁMICA DE CÁLCULO DE DÍAS REALES
+# FUNCIÓN DINÁMICA DE CÁLCULO DE DÍAS REALES (CON RESPECTO A HOY)
 # ---------------------------------------------------------
 def calculate_days_for_period(df_subset, year=None, entity_first_date=None):
     now = pd.Timestamp.now().normalize()
@@ -282,14 +292,14 @@ def calculate_days_for_period(df_subset, year=None, entity_first_date=None):
     else:
         if df_subset.empty:
             return 1
-        start_date = df_subset["Fecha"].min().normalize()
-        max_date_sub = df_subset["Fecha"].max().normalize()
         
-        if max_date_sub.year == current_year:
-            end_date = now
+        if entity_first_date is not None and pd.notnull(entity_first_date):
+            start_date = pd.Timestamp(entity_first_date).normalize()
         else:
-            end_date = max_date_sub
+            start_date = df_subset["Fecha"].min().normalize()
             
+        # Calcula siempre hasta el día de hoy dinámicamente
+        end_date = now
         days = (end_date - start_date).days + 1
         return max(days, 1)
 
@@ -302,7 +312,6 @@ def render_excel_table(df, currency_cols=None):
         
     n_cols = len(df.columns)
     
-    # Distribución de anchos de columna para optimizar móvil
     if n_cols == 4:
         col_widths = ["36%", "15%", "24.5%", "24.5%"]
     elif n_cols == 3:
@@ -419,7 +428,7 @@ else:
         <div class="total-card-box">
             <div class="card-header-flex">
                 <span class="card-name-title" style="color: #00D1B2 !important;">⭐ TOTAL GENERAL</span>
-                <span class="card-time-badge" style="background: rgba(0,209,178,0.15); color: #00D1B2;">⏱️ {tot_dias:,} días</span>
+                <span class="card-time-badge" style="background: rgba(0,209,178,0.15); color: #00D1B2; border-color: rgba(0,209,178,0.3);">⏱️ {tot_dias:,} días</span>
             </div>
             <div class="card-metrics-grid">
                 <div class="submetric-box"><div class="submetric-lbl" style="color: #00D1B2;">TOTAL</div><div class="val-total-tot">${tot_consumo:,.2f}</div></div>
