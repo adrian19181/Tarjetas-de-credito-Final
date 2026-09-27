@@ -705,7 +705,7 @@ def wrap_labels(text, width=18):
 ])
 
 # ---------------------------------------------------------
-# GRÁFICO 1: LIQUIDEZ A CUBRIR POR TARJETA (AMEX EN MORADO SUAVE)
+# GRÁFICO 1: LIQUIDEZ A CUBRIR POR TARJETA (RENOMBRADO A Prod. MC)
 # ---------------------------------------------------------
 with tab_grafico_pie:
   if not df_filtrado.empty:
@@ -723,11 +723,12 @@ with tab_grafico_pie:
     if not df_chart_pie.empty:
       df_pie = df_chart_pie.groupby("Tarjeta")["Valor"].sum().reset_index()
 
-      # Renombrar MasterCard Produbanco a PRODUBANCO MC solo para este gráfico
+      # Renombrar variaciones de Produbanco a 'Prod. MC'
       df_pie["Tarjeta"] = df_pie["Tarjeta"].replace({
-          "MasterCard Produbanco": "PRODUBANCO MC",
-          "Mastercard Produbanco": "PRODUBANCO MC",
-          "MASTERCARD PRODUBANCO": "PRODUBANCO MC",
+          "MasterCard Produbanco": "Prod. MC",
+          "Mastercard Produbanco": "Prod. MC",
+          "MASTERCARD PRODUBANCO": "Prod. MC",
+          "PRODUBANCO MC": "Prod. MC",
       })
 
       st.markdown(
@@ -736,12 +737,12 @@ with tab_grafico_pie:
           unsafe_allow_html=True,
       )
 
-      # Mapa de colores explícito: AMEX recibe el morado suave (#A855F7) para alto contraste con texto blanco
+      # Mapa de colores explícito usando Prod. MC
       card_colors = {
-          "AMEX": "#A855F7",           # Morado suave destacado
-          "Mastercard": "#6366F1",     # Índigo / Violeta profundo
-          "Visa": "#10B981",           # Verde esmeralda
-          "PRODUBANCO MC": "#2563EB",  # Azul eléctrico
+          "AMEX": "#A855F7",       # Morado suave
+          "Mastercard": "#6366F1", # Índigo / Violeta profundo
+          "Visa": "#10B981",       # Verde esmeralda
+          "Prod. MC": "#2563EB",   # Azul eléctrico
       }
 
       fig_pie = px.pie(
