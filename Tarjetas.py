@@ -52,7 +52,7 @@ st.markdown(
             color: #FAFAFA !important;
         }
         [data-testid="stHeader"] { background-color: rgba(0, 0, 0, 0) !important; }
-        .block-container { padding: 1.2rem 0.5rem 2rem 0.5rem; max-width: 740px; }
+        .block-container { padding: 1.2rem 0.4rem 2rem 0.4rem; max-width: 740px; }
 
         div[data-testid="stTabs"] [data-baseweb="tab-list"] {
             background-color: transparent !important;
@@ -200,7 +200,6 @@ st.markdown(
         .total-card-box { background: linear-gradient(135deg, #132433 0%, #1E222B 100%); border: 1.8px solid #00D1B2; border-radius: 12px; padding: 14px 16px; margin-top: 6px; margin-bottom: 14px; }
         .card-header-flex { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
         
-        /* TÍTULOS DE KPI CON FUENTE MÁS GRANDE */
         .card-name-title { font-size: 1.25rem !important; font-weight: 800 !important; margin: 0; color: #FFFFFF !important; }
         
         .card-time-badge { font-size: 0.75rem; color: #A0AEC0; background: #2D323E; padding: 3px 8px; border-radius: 6px; font-weight: 600; }
@@ -295,21 +294,31 @@ def calculate_days_for_period(df_subset, year=None, entity_first_date=None):
         return max(days, 1)
 
 # ---------------------------------------------------------
-# HELPER: TABLAS COMPACTAS CON NÚMEROS CENTRADOS
+# HELPER: TABLAS COMPACTAS CON ANCHO OPTIMIZADO PARA MÓVIL
 # ---------------------------------------------------------
 def render_excel_table(df, currency_cols=None):
     if currency_cols is None:
         currency_cols = ["Suma de Valor", "Valor", "Gasto / Día"]
         
-    html = """
+    n_cols = len(df.columns)
+    
+    # Distribución de anchos de columna para optimizar móvil
+    if n_cols == 4:
+        col_widths = ["36%", "15%", "24.5%", "24.5%"]
+    elif n_cols == 3:
+        col_widths = ["42%", "29%", "29%"]
+    else:
+        col_widths = [f"{100//n_cols}%"] * n_cols
+
+    html = f"""
     <div style="overflow-x: auto; border-radius: 10px; border: 1.5px solid #107C41; margin-top: 6px; margin-bottom: 12px; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);">
-    <table style="width:100%; border-collapse: collapse; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 0.86rem; color: #FAFAFA; table-layout: auto;">
+    <table style="width:100%; border-collapse: collapse; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 0.85rem; color: #FAFAFA; table-layout: fixed;">
         <thead><tr style="background: linear-gradient(135deg, #107C41 0%, #0D5C30 100%); color: #FFFFFF;">
     """
-    for col in df.columns:
-        # Centrar encabezados de números y años
+    for idx, col in enumerate(df.columns):
         align = "center" if col in currency_cols or "Suma" in col or "Valor" in col or "Día" in col or "Año" in col else "left"
-        html += f'<th style="padding: 8px 6px; border-bottom: 2px solid #1B9E52; text-align: {align}; font-weight: 700; white-space: nowrap;">{col}</th>'
+        w_style = f"width: {col_widths[idx]};" if idx < len(col_widths) else ""
+        html += f'<th style="padding: 8px 4px; border-bottom: 2px solid #1B9E52; text-align: {align}; font-weight: 700; white-space: nowrap; {w_style}">{col}</th>'
     html += '</tr></thead><tbody>'
 
     total_rows = len(df)
@@ -322,10 +331,9 @@ def render_excel_table(df, currency_cols=None):
             row_style = f"background-color: {row_bg}; color: #FAFAFA;"
 
         html += f'<tr style="{row_style}">'
-        for col in df.columns:
+        for c_idx, col in enumerate(df.columns):
             val = row[col]
             
-            # Centrar números, montos y años
             is_numeric_col = col in currency_cols or "Suma" in col or "Valor" in col or "Día" in col or "Año" in col or isinstance(val, (int, float))
             align = "center" if is_numeric_col else "left"
             
@@ -333,7 +341,6 @@ def render_excel_table(df, currency_cols=None):
                 val_str = f"${val:,.2f}" if col in currency_cols or "Suma" in col or "Valor" in col or "Día" in col else f"{val:,}"
             else:
                 val_str = str(val)
-                # Formato en doble línea para nombres de categoría largos
                 if "Importacion" in val_str or "Impuestos" in val_str:
                     val_str = val_str.replace(" (", "<br>(")
                 elif len(val_str) > 22 and "(" in val_str:
@@ -341,7 +348,7 @@ def render_excel_table(df, currency_cols=None):
                 elif len(val_str) > 24:
                     val_str = "<br>".join(textwrap.wrap(val_str, width=20))
 
-            style_extra = "line-height: 1.25; padding: 7px 6px; border-bottom: 1px solid #2A323D;"
+            style_extra = "line-height: 1.25; padding: 7px 4px; border-bottom: 1px solid #2A323D;"
             if not is_numeric_col:
                 style_extra += " white-space: normal; word-break: break-word;"
             else:
@@ -396,9 +403,9 @@ else:
                     <span class="card-time-badge">⏱️ {n_dias:,} días</span>
                 </div>
                 <div class="card-metrics-grid">
-                    <div class="submetric-box"><div class="submetric-lbl">Total</div><div class="val-total">${c_total:,.2f}</div></div>
-                    <div class="submetric-box"><div class="submetric-lbl">/ Día</div><div class="val-daily">${gasto_dia:,.2f}</div></div>
-                    <div class="submetric-box"><div class="submetric-lbl">Pagos</div><div class="val-payments">{len(g):,}</div></div>
+                    <div class="submetric-box"><div class="submetric-lbl">TOTAL</div><div class="val-total">${c_total:,.2f}</div></div>
+                    <div class="submetric-box"><div class="submetric-lbl">GASTO \ DÍA</div><div class="val-daily">${gasto_dia:,.2f}</div></div>
+                    <div class="submetric-box"><div class="submetric-lbl">PAGOS</div><div class="val-payments">{len(g):,}</div></div>
                 </div>
             </div>
             """, unsafe_allow_html=True
@@ -415,9 +422,9 @@ else:
                 <span class="card-time-badge" style="background: rgba(0,209,178,0.15); color: #00D1B2;">⏱️ {tot_dias:,} días</span>
             </div>
             <div class="card-metrics-grid">
-                <div class="submetric-box"><div class="submetric-lbl" style="color: #00D1B2;">Total</div><div class="val-total-tot">${tot_consumo:,.2f}</div></div>
-                <div class="submetric-box"><div class="submetric-lbl" style="color: #38BDF8;">/ Día</div><div class="val-daily-tot">${tot_gasto_dia:,.2f}</div></div>
-                <div class="submetric-box"><div class="submetric-lbl" style="color: #FBBF24;">Pagos</div><div class="val-payments-tot">{len(df_filtrado):,}</div></div>
+                <div class="submetric-box"><div class="submetric-lbl" style="color: #00D1B2;">TOTAL</div><div class="val-total-tot">${tot_consumo:,.2f}</div></div>
+                <div class="submetric-box"><div class="submetric-lbl" style="color: #38BDF8;">GASTO \ DÍA</div><div class="val-daily-tot">${tot_gasto_dia:,.2f}</div></div>
+                <div class="submetric-box"><div class="submetric-lbl" style="color: #FBBF24;">PAGOS</div><div class="val-payments-tot">{len(df_filtrado):,}</div></div>
             </div>
         </div>
         """, unsafe_allow_html=True
