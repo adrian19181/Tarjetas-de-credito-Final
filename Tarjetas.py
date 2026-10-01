@@ -311,77 +311,137 @@ def calculate_days_for_period(df_subset, year=None, entity_first_date=None):
 
 
 # ---------------------------------------------------------
-# HELPER: TABLAS COMPACTAS CON ANCHO OPTIMIZADO PARA MÓVIL
+# HELPER: TABLAS COMPACTAS 2D STICKY OPTIMIZADAS
 # ---------------------------------------------------------
 def render_excel_table(df, currency_cols=None):
   if currency_cols is None:
     currency_cols = ["Suma de Valor", "Valor", "Gasto / Día"]
 
-  n_cols = len(df.columns)
+  css = """<style>
+/* Contenedor principal con scroll 2D y sin sangría */
+.tbl-det-wrapper {
+    max-height: 480px;
+    width: 100%;
+    overflow-y: auto;
+    overflow-x: auto;
+    border: 1.5px solid #107C41;
+    border-radius: 10px;
+    background-color: #14171E;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
+    margin-top: 6px;
+    margin-bottom: 12px;
+    display: block;
+    position: relative;
+    padding: 0px !important;
+}
 
-  if n_cols == 4:
-    col_widths = ["36%", "15%", "24.5%", "24.5%"]
-  elif n_cols == 3:
-    col_widths = ["42%", "29%", "29%"]
-  else:
-    col_widths = [f"{100//n_cols}%"] * n_cols
+/* Configuración estricta de la tabla */
+.tbl-det-sticky {
+    width: 100%;
+    border-collapse: separate !important;
+    border-spacing: 0 !important;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-size: 0.85rem;
+    color: #FAFAFA;
+    margin: 0;
+    table-layout: auto;
+}
 
-  html = f"""
-    <div style="overflow-x: auto; border-radius: 10px; border: 1.5px solid #107C41; margin-top: 6px; margin-bottom: 12px; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);">
-    <table style="width:100%; border-collapse: collapse; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 0.85rem; color: #FAFAFA; table-layout: fixed;">
-        <thead><tr style="background: linear-gradient(135deg, #107C41 0%, #0D5C30 100%); color: #FFFFFF;">
-    """
+/* Encabezados (TH) fijos arriba */
+.tbl-det-sticky th {
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 20 !important;
+    background-color: #0D5C30 !important;
+    color: #FFFFFF !important;
+    border-bottom: 2px solid #1B9E52 !important;
+    padding: 8px 4px !important;
+    text-align: center !important;
+    font-weight: 700 !important;
+    white-space: nowrap !important;
+}
+
+/* Esquina superior izquierda inmovilizada */
+.tbl-det-sticky th:first-child {
+    position: sticky !important;
+    top: 0 !important;
+    left: 0 !important;
+    z-index: 50 !important;
+    text-align: left !important;
+    width: 125px !important;
+    min-width: 125px !important;
+    max-width: 125px !important;
+    box-shadow: 2px 0 5px rgba(0,0,0,0.3) !important;
+}
+
+/* Celdas de datos normales (estáticas) */
+.tbl-det-sticky td {
+    position: static !important;
+    z-index: auto !important;
+    padding: 7px 4px !important;
+    border-bottom: 1px solid #2A323D !important;
+    vertical-align: middle !important;
+}
+
+/* Primera columna inmovilizada con texto multilínea */
+.tbl-det-sticky .lbl-sticky-col {
+    position: sticky !important;
+    left: 0 !important;
+    z-index: 30 !important;
+    font-weight: 700 !important;
+    text-align: left !important;
+    width: 125px !important;
+    min-width: 125px !important;
+    max-width: 125px !important;
+    box-shadow: 3px 0 6px rgba(0,0,0,0.4) !important;
+    background-clip: padding-box !important;
+    white-space: normal !important;
+    word-wrap: break-word !important;
+}
+
+/* Colores de fila sin inline styles para el fondo */
+.row-det-even td { background-color: #1A1D24 !important; color: #FAFAFA; }
+.row-det-even .lbl-sticky-col { background-color: #1A1D24 !important; }
+
+.row-det-odd td { background-color: #222733 !important; color: #FAFAFA; }
+.row-det-odd .lbl-sticky-col { background-color: #222733 !important; }
+
+.row-det-total td { background-color: #133322 !important; color: #00E676 !important; font-weight: bold; border-top: 2px solid #107C41 !important; }
+.row-det-total .lbl-sticky-col { background-color: #133322 !important; color: #00E676 !important; }
+</style>"""
+  
+  html = f'{css}<div class="tbl-det-wrapper"><table class="tbl-det-sticky">'
+  html += '<thead><tr>'
+  
   for idx, col in enumerate(df.columns):
-    align = (
-        "center"
-        if col in currency_cols
-        or "Suma" in col
-        or "Valor" in col
-        or "Día" in col
-        or "Año" in col
-        else "left"
-    )
-    w_style = f"width: {col_widths[idx]};" if idx < len(col_widths) else ""
-    html += f'<th style="padding: 8px 4px; border-bottom: 2px solid #1B9E52; text-align: {align}; font-weight: 700; white-space: nowrap; {w_style}">{col}</th>'
-  html += "</tr></thead><tbody>"
+    align = "center" if (col in currency_cols or "Suma" in col or "Valor" in col or "Día" in col or "Año" in col) else "left"
+    col_title = str(col)
+    
+    # Partir 'Suma de Valor' en 2 líneas
+    if col_title == "Suma de Valor":
+      col_title = "Suma de<br>Valor"
+        
+    html += f'<th style="text-align: {align} !important;">{col_title}</th>'
+  html += '</tr></thead><tbody>'
 
   total_rows = len(df)
   for idx, row in df.iterrows():
-    is_total_row = (idx == total_rows - 1) and any(
-        str(v).upper().startswith("TOTAL") for v in row.values
-    )
+    is_total_row = (idx == total_rows - 1) and any(str(v).upper().startswith("TOTAL") for v in row.values)
+    
     if is_total_row:
-      row_style = (
-          "background-color: #133322; font-weight: bold; border-top: 2px solid"
-          " #107C41; color: #00E676;"
-      )
+      row_class = "row-det-total"
     else:
-      row_bg = "#1A1D24" if idx % 2 == 0 else "#222733"
-      row_style = f"background-color: {row_bg}; color: #FAFAFA;"
+      row_class = "row-det-even" if idx % 2 == 0 else "row-det-odd"
 
-    html += f'<tr style="{row_style}">'
+    html += f'<tr class="{row_class}">'
     for c_idx, col in enumerate(df.columns):
       val = row[col]
 
-      is_numeric_col = (
-          col in currency_cols
-          or "Suma" in col
-          or "Valor" in col
-          or "Día" in col
-          or "Año" in col
-          or isinstance(val, (int, float))
-      )
+      is_numeric_col = (col in currency_cols or "Suma" in col or "Valor" in col or "Día" in col or "Año" in col or isinstance(val, (int, float)))
       align = "center" if is_numeric_col else "left"
 
       if isinstance(val, (int, float)):
-        val_str = (
-            f"${val:,.2f}"
-            if col in currency_cols
-            or "Suma" in col
-            or "Valor" in col
-            or "Día" in col
-            else f"{val:,}"
-        )
+        val_str = f"${val:,.2f}" if (col in currency_cols or "Suma" in col or "Valor" in col or "Día" in col) else f"{val:,}"
       else:
         val_str = str(val)
         if "Importacion" in val_str or "Impuestos" in val_str:
@@ -391,20 +451,21 @@ def render_excel_table(df, currency_cols=None):
         elif len(val_str) > 24:
           val_str = "<br>".join(textwrap.wrap(val_str, width=20))
 
-      style_extra = (
-          "line-height: 1.25; padding: 7px 4px; border-bottom: 1px solid"
-          " #2A323D;"
-      )
+      style_extra = f"text-align: {align} !important;"
       if not is_numeric_col:
-        style_extra += " white-space: normal; word-break: break-word;"
+        style_extra += " white-space: normal !important; word-break: break-word !important;"
       else:
-        style_extra += " white-space: nowrap;"
+        style_extra += " white-space: nowrap !important;"
 
-      html += f'<td style="{style_extra} text-align: {align};">{val_str}</td>'
+      if c_idx == 0:
+        html += f'<td class="lbl-sticky-col" style="{style_extra}">{val_str}</td>'
+      else:
+        html += f'<td style="{style_extra}">{val_str}</td>'
+
     html += "</tr>"
   html += "</tbody></table></div>"
-  return html
-
+  
+  return html.replace(chr(10), ' ')
 
 # ---------------------------------------------------------
 # CABECERA & BOTÓN REFRESCAR
