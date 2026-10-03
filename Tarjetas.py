@@ -367,7 +367,7 @@ def render_excel_table(df, currency_cols=None):
     top: 0 !important;
     left: 0 !important;
     z-index: 50 !important;
-    text-align: left !important;
+    text-align: center !important;
     width: 125px !important;
     min-width: 125px !important;
     max-width: 125px !important;
@@ -381,6 +381,7 @@ def render_excel_table(df, currency_cols=None):
     padding: 7px 4px !important;
     border-bottom: 1px solid #2A323D !important;
     vertical-align: middle !important;
+    text-align: center !important;
 }
 
 /* Primera columna inmovilizada con texto multilínea */
@@ -389,7 +390,7 @@ def render_excel_table(df, currency_cols=None):
     left: 0 !important;
     z-index: 30 !important;
     font-weight: 700 !important;
-    text-align: left !important;
+    text-align: center !important;
     width: 125px !important;
     min-width: 125px !important;
     max-width: 125px !important;
@@ -414,14 +415,13 @@ def render_excel_table(df, currency_cols=None):
   html += '<thead><tr>'
   
   for idx, col in enumerate(df.columns):
-    align = "center" if (col in currency_cols or "Suma" in col or "Valor" in col or "Día" in col or "Año" in col) else "left"
     col_title = str(col)
     
     # Partir 'Suma de Valor' en 2 líneas
     if col_title == "Suma de Valor":
       col_title = "Suma de<br>Valor"
         
-    html += f'<th style="text-align: {align} !important;">{col_title}</th>'
+    html += f'<th style="text-align: center !important;">{col_title}</th>'
   html += '</tr></thead><tbody>'
 
   total_rows = len(df)
@@ -438,7 +438,6 @@ def render_excel_table(df, currency_cols=None):
       val = row[col]
 
       is_numeric_col = (col in currency_cols or "Suma" in col or "Valor" in col or "Día" in col or "Año" in col or isinstance(val, (int, float)))
-      align = "center" if is_numeric_col else "left"
 
       if isinstance(val, (int, float)):
         val_str = f"${val:,.2f}" if (col in currency_cols or "Suma" in col or "Valor" in col or "Día" in col) else f"{val:,}"
@@ -451,7 +450,7 @@ def render_excel_table(df, currency_cols=None):
         elif len(val_str) > 24:
           val_str = "<br>".join(textwrap.wrap(val_str, width=20))
 
-      style_extra = f"text-align: {align} !important;"
+      style_extra = "text-align: center !important;"
       if not is_numeric_col:
         style_extra += " white-space: normal !important; word-break: break-word !important;"
       else:
