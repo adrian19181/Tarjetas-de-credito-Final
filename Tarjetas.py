@@ -10,6 +10,10 @@ import plotly.express as px
 import requests
 import streamlit as st
 import streamlit.components.v1 as components
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import letter
+from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+from reportlab.platypus import HRFlowable, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 # ---------------------------------------------------------
 # CONFIGURACIÓN DE PÁGINA
@@ -311,6 +315,316 @@ def calculate_days_for_period(df_subset, year=None, entity_first_date=None):
 
 
 # ---------------------------------------------------------
+# GENERADOR DE REPORTE PDF
+# ---------------------------------------------------------
+def generar_pdf(df_data):
+  buffer = io.BytesIO()
+  doc = SimpleDocTemplate(
+      buffer,
+      pagesize=letter,
+      rightMargin=36,
+      leftMargin=36,
+      topMargin=36,
+      bottomMargin=36,
+  )
+  styles = getSampleStyleSheet()
+
+  title_style = ParagraphStyle(
+      "DocTitle",
+      parent=styles["Heading1"],
+      fontName="Helvetica-Bold",
+      fontSize=18,
+      leading=22,
+      textColor=colors.HexColor("#0F172A"),
+      alignment=1,
+      spaceAfter=10,
+  )
+
+  h2_style = ParagraphStyle(
+      "SectionHeading",
+      parent=styles["Heading2"],
+      fontName="Helvetica-Bold",
+      fontSize=13,
+      leading=16,
+      textColor=colors.HexColor("#0F172A"),
+      spaceBefore=12,
+      spaceAfter=6,
+  )
+
+  cell_style = ParagraphStyle(
+      "CellText",
+      fontName="Helvetica",
+      fontSize=8,
+      leading=10,
+      textColor=colors.HexColor("#000000"),
+      alignment=1,
+  )
+
+  cell_bold = ParagraphStyle(
+      "CellBold",
+      fontName="Helvetica-Bold",
+      fontSize=8,
+      leading=10,
+      textColor=colors.HexColor("#000000"),
+      alignment=1,
+  )
+
+  cell_left_bold = ParagraphStyle(
+      "CellLeftBold",
+      fontName="Helvetica-Bold",
+      fontSize=8,
+      leading=10,
+      textColor=colors.HexColor("#000000"),
+      alignment=0,
+  )
+
+  header_style = ParagraphStyle(
+      "HeaderStyle",
+      fontName="Helvetica-Bold",
+      fontSize=8,
+      leading=10,
+      textColor=colors.white,
+      alignment=1,
+  )
+
+  story = []
+
+  story.append(Paragraph("Consumos Tarjetas de Crédito", title_style))
+  story.append(
+      Paragraph(
+          f"Reporte generado el {pd.Timestamp.now().strftime('%d/%m/%Y %H:%M')}",
+          cell_style,
+      )
+  )
+  story.append(Spacer(1, 10))
+
+  # 1. RESUMEN DE CONSUMOS POR TARJETA
+  story.append(Paragraph("1. Resumen de Consumos por Tarjeta", h2_style))
+  story.append(
+      HRFlowable(
+          width="100%",
+          thickness=1,
+          color=colors.HexColor("#0F172A"),
+          spaceBefore=2,
+          spaceAfter=8,
+      )
+  )
+
+  card_headers = ["Tarjeta", "Total ($)", "Gasto / Día ($)", "Pagos", "Días Real"]
+  card_table_data = [
+      [Paragraph(f"<b>{h}</b>", header_style) for h in card_headers]
+  ]
+
+  for tarjeta, g in df_data.groupby("Tarjeta"):
+    c_total = g["Valor"].sum()
+    card_first_date = (
+        df_data[df_data["Tarjeta"] == tarjeta]["Fecha"].min().normalize()
+    )
+    n_dias = calculate_days_for_period(
+        g, year=None, entity_first_date=card_first_date
+    )
+    gasto_dia = c_total / n_dias if n_dias > 0 else 0.0
+
+    card_table_data.append([
+        Paragraph(str(tarjeta), cell_left_bold),
+        Paragraph(f"${c_total:,.2f}", cell_style),
+        Paragraph(f"${gasto_dia:,.2f}", cell_style),
+        Paragraph(f"{len(g):,}", cell_style),
+        Paragraph(f"{n_dias:,}", cell_style),
+    ])
+
+  tot_consumo = df_data["Valor"].sum()
+  tot_dias = calculate_days_for_period(df_data, year=None)
+  tot_gasto_dia = tot_consumo / tot_dias if tot_dias > 0 else 0.0
+
+  card_table_data.append([
+      Paragraph("TOTAL GENERAL", cell_left_bold),
+      Paragraph(f"<b>${tot_consumo:,.2f}</b>", cell_bold),
+      Paragraph(f"<b>${tot_gasto_dia:,.2f}</b>", cell_bold),
+      Paragraph(f"<b>{len(df_data):,}</b>", cell_bold),
+      Paragraph(f"<b>{tot_dias:,}</b>", cell_bold),
+  ])
+
+  col_w_card = 540.0 / len(card_headers)
+  t_cards = Table(card_table_data, colWidths=[col_w_card] * len(card_headers))
+  t_cards_style = [
+      ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#107C41")),
+      ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+      ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+      ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#000000")),
+      ("TOPPADDING", (0, 0), (-1, -1), 4),
+      ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+  ]
+
+  for r_idx in range(1, len(card_table_data) - 1):
+    bg = colors.HexColor("#F9FAFB") if r_idx % 2 == 1 else colors.white
+    t_cards_style.append(("BACKGROUND", (0, r_idx), (-1, r_idx), bg))
+
+  t_cards_style.append(
+      ("BACKGROUND", (0, -1), (-1, -1), colors.HexColor("#E8F5E9"))
+  )
+  t_cards.setStyle(TableStyle(t_cards_style))
+  story.append(t_cards)
+  story.append(Spacer(1, 12))
+
+  # 2. RESUMEN POR AÑO
+  story.append(Paragraph("2. Consumos por Año", h2_style))
+  story.append(
+      HRFlowable(
+          width="100%",
+          thickness=1,
+          color=colors.HexColor("#0F172A"),
+          spaceBefore=2,
+          spaceAfter=8,
+      )
+  )
+
+  records_anio = []
+  for anio_val, g_anio in df_data.groupby("Año"):
+    val_sum = g_anio["Valor"].sum()
+    n_dias = calculate_days_for_period(
+        g_anio, year=anio_val, entity_first_date=g_anio["Fecha"].min()
+    )
+    records_anio.append({
+        "Año": str(anio_val),
+        "Suma de Valor": val_sum,
+        "Gasto / Día": val_sum / n_dias if n_dias > 0 else 0.0,
+        "_year_int": int(anio_val),
+    })
+
+  tabla_anio = pd.DataFrame(records_anio).sort_values(
+      by="_year_int", ascending=False
+  )
+
+  anio_headers = ["Año", "Suma de Valor ($)", "Gasto / Día ($)"]
+  anio_table_data = [
+      [Paragraph(f"<b>{h}</b>", header_style) for h in anio_headers]
+  ]
+
+  for _, r in tabla_anio.iterrows():
+    anio_table_data.append([
+        Paragraph(r["Año"], cell_bold),
+        Paragraph(f"${r['Suma de Valor']:,.2f}", cell_style),
+        Paragraph(f"${r['Gasto / Día']:,.2f}", cell_style),
+    ])
+
+  tot_val_a = tabla_anio["Suma de Valor"].sum()
+  tot_dias_a = calculate_days_for_period(df_data, year=None)
+  gasto_dia_tot_a = tot_val_a / tot_dias_a if tot_dias_a > 0 else 0.0
+
+  anio_table_data.append([
+      Paragraph("Total General", cell_left_bold),
+      Paragraph(f"<b>${tot_val_a:,.2f}</b>", cell_bold),
+      Paragraph(f"<b>${gasto_dia_tot_a:,.2f}</b>", cell_bold),
+  ])
+
+  col_w_anio = 540.0 / len(anio_headers)
+  t_anio = Table(anio_table_data, colWidths=[col_w_anio] * len(anio_headers))
+  t_anio_style = [
+      ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1F2937")),
+      ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+      ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+      ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#000000")),
+      ("TOPPADDING", (0, 0), (-1, -1), 4),
+      ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+  ]
+
+  for r_idx in range(1, len(anio_table_data) - 1):
+    bg = colors.HexColor("#F3F4F6") if r_idx % 2 == 1 else colors.white
+    t_anio_style.append(("BACKGROUND", (0, r_idx), (-1, r_idx), bg))
+
+  t_anio_style.append(
+      ("BACKGROUND", (0, -1), (-1, -1), colors.HexColor("#E5E7EB"))
+  )
+  t_anio.setStyle(TableStyle(t_anio_style))
+  story.append(t_anio)
+  story.append(Spacer(1, 12))
+
+  # 3. CONSUMOS POR CATEGORÍA / ESTABLECIMIENTO
+  story.append(
+      Paragraph("3. Consumos por Categoría / Establecimiento", h2_style)
+  )
+  story.append(
+      HRFlowable(
+          width="100%",
+          thickness=1,
+          color=colors.HexColor("#0F172A"),
+          spaceBefore=2,
+          spaceAfter=8,
+      )
+  )
+
+  cat_first_dates = df_data.groupby("Establecimiento")["Fecha"].min().to_dict()
+  records_cat = []
+  for cat, g_sub in df_data.groupby("Establecimiento"):
+    val_sum = g_sub["Valor"].sum()
+    f_first = cat_first_dates.get(cat, g_sub["Fecha"].min())
+    n_dias = calculate_days_for_period(
+        g_sub, year=None, entity_first_date=f_first
+    )
+    records_cat.append({
+        "Categoría": cat,
+        "Suma de Valor": val_sum,
+        "Gasto / Día": val_sum / n_dias if n_dias > 0 else 0.0,
+    })
+
+  tabla_cat = pd.DataFrame(records_cat).sort_values(
+      by="Suma de Valor", ascending=False
+  )
+
+  cat_headers = [
+      "Categoría / Establecimiento",
+      "Suma de Valor ($)",
+      "Gasto / Día ($)",
+  ]
+  cat_table_data = [
+      [Paragraph(f"<b>{h}</b>", header_style) for h in cat_headers]
+  ]
+
+  for _, r in tabla_cat.iterrows():
+    cat_table_data.append([
+        Paragraph(r["Categoría"], cell_left_bold),
+        Paragraph(f"${r['Suma de Valor']:,.2f}", cell_style),
+        Paragraph(f"${r['Gasto / Día']:,.2f}", cell_style),
+    ])
+
+  tot_val_c = tabla_cat["Suma de Valor"].sum()
+  tot_dias_c = calculate_days_for_period(df_data, year=None)
+  gasto_dia_tot_c = tot_val_c / tot_dias_c if tot_dias_c > 0 else 0.0
+
+  cat_table_data.append([
+      Paragraph("Total General", cell_left_bold),
+      Paragraph(f"<b>${tot_val_c:,.2f}</b>", cell_bold),
+      Paragraph(f"<b>${gasto_dia_tot_c:,.2f}</b>", cell_bold),
+  ])
+
+  col_w_cat = [260.0, 140.0, 140.0]
+  t_cat = Table(cat_table_data, colWidths=col_w_cat)
+  t_cat_style = [
+      ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1F2937")),
+      ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+      ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+      ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#000000")),
+      ("TOPPADDING", (0, 0), (-1, -1), 3),
+      ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+  ]
+
+  for r_idx in range(1, len(cat_table_data) - 1):
+    bg = colors.HexColor("#F9FAFB") if r_idx % 2 == 1 else colors.white
+    t_cat_style.append(("BACKGROUND", (0, r_idx), (-1, r_idx), bg))
+
+  t_cat_style.append(
+      ("BACKGROUND", (0, -1), (-1, -1), colors.HexColor("#E5E7EB"))
+  )
+  t_cat.setStyle(TableStyle(t_cat_style))
+  story.append(t_cat)
+
+  doc.build(story)
+  buffer.seek(0)
+  return buffer.getvalue()
+
+
+# ---------------------------------------------------------
 # HELPER: TABLAS COMPACTAS 2D STICKY OPTIMIZADAS
 # ---------------------------------------------------------
 def render_excel_table(df, currency_cols=None):
@@ -410,24 +724,26 @@ def render_excel_table(df, currency_cols=None):
 .row-det-total td { background-color: #133322 !important; color: #00E676 !important; font-weight: bold; border-top: 2px solid #107C41 !important; }
 .row-det-total .lbl-sticky-col { background-color: #133322 !important; color: #00E676 !important; }
 </style>"""
-  
+
   html = f'{css}<div class="tbl-det-wrapper"><table class="tbl-det-sticky">'
-  html += '<thead><tr>'
-  
+  html += "<thead><tr>"
+
   for idx, col in enumerate(df.columns):
     col_title = str(col)
-    
+
     # Partir 'Suma de Valor' en 2 líneas
     if col_title == "Suma de Valor":
       col_title = "Suma de<br>Valor"
-        
+
     html += f'<th style="text-align: center !important;">{col_title}</th>'
-  html += '</tr></thead><tbody>'
+  html += "</tr></thead><tbody>"
 
   total_rows = len(df)
   for idx, row in df.iterrows():
-    is_total_row = (idx == total_rows - 1) and any(str(v).upper().startswith("TOTAL") for v in row.values)
-    
+    is_total_row = (idx == total_rows - 1) and any(
+        str(v).upper().startswith("TOTAL") for v in row.values
+    )
+
     if is_total_row:
       row_class = "row-det-total"
     else:
@@ -437,10 +753,26 @@ def render_excel_table(df, currency_cols=None):
     for c_idx, col in enumerate(df.columns):
       val = row[col]
 
-      is_numeric_col = (col in currency_cols or "Suma" in col or "Valor" in col or "Día" in col or "Año" in col or isinstance(val, (int, float)))
+      is_numeric_col = (
+          col in currency_cols
+          or "Suma" in col
+          or "Valor" in col
+          or "Día" in col
+          or "Año" in col
+          or isinstance(val, (int, float))
+      )
 
       if isinstance(val, (int, float)):
-        val_str = f"${val:,.2f}" if (col in currency_cols or "Suma" in col or "Valor" in col or "Día" in col) else f"{val:,}"
+        val_str = (
+            f"${val:,.2f}"
+            if (
+                col in currency_cols
+                or "Suma" in col
+                or "Valor" in col
+                or "Día" in col
+            )
+            else f"{val:,}"
+        )
       else:
         val_str = str(val)
         if "Importacion" in val_str or "Impuestos" in val_str:
@@ -452,7 +784,10 @@ def render_excel_table(df, currency_cols=None):
 
       style_extra = "text-align: center !important;"
       if not is_numeric_col:
-        style_extra += " white-space: normal !important; word-break: break-word !important;"
+        style_extra += (
+            " white-space: normal !important; word-break: break-word !"
+            "important;"
+        )
       else:
         style_extra += " white-space: nowrap !important;"
 
@@ -463,22 +798,32 @@ def render_excel_table(df, currency_cols=None):
 
     html += "</tr>"
   html += "</tbody></table></div>"
-  
-  return html.replace(chr(10), ' ')
+
+  return html.replace(chr(10), " ")
+
 
 # ---------------------------------------------------------
-# CABECERA & BOTÓN REFRESCAR
+# CABECERA & BOTONES REFRESCAR / PDF
 # ---------------------------------------------------------
-header_col1, header_col2 = st.columns([2.5, 1.5], vertical_alignment="center")
-with header_col1:
-  st.markdown(
-      "<h3 style='margin: 0; color: #FFFFFF !important;'>💳 Mis Consumos</h3>",
-      unsafe_allow_html=True,
-  )
-with header_col2:
+col_act, col_pdf = st.columns(2)
+with col_act:
   if st.button("🔄 Refrescar", use_container_width=True):
     st.cache_data.clear()
     st.rerun()
+with col_pdf:
+  pdf_bytes = generar_pdf(df_raw)
+  st.download_button(
+      label="📄 Exportar a PDF",
+      data=pdf_bytes,
+      file_name="Consumos Tarjetas.pdf",
+      mime="application/pdf",
+      use_container_width=True,
+  )
+
+st.markdown(
+    "<h3 style='margin: 10px 0; color: #FFFFFF !important;'>💳 Mis Consumos</h3>",
+    unsafe_allow_html=True,
+)
 
 # ---------------------------------------------------------
 # FILTROS GLOBALES
